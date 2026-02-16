@@ -56,8 +56,8 @@ export const authOptions: NextAuthOptions = {
                     kelas: user.kelas,
                     fotoProfilUrl: user.fotoProfilUrl,
                     mapelDiampu: user.mapelDiampu,
-                    loginIp: ip // Pass IP to the user object temporarily
-                }
+                    loginIp: ip
+                } as any
             }
         })
     ],

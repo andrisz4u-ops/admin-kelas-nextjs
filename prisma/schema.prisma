@@ -158,6 +158,22 @@ model Aset {
   updatedAt        DateTime  @updatedAt
 }
 
+// Jadwal Pelajaran
+model JadwalPelajaran {
+  id        String   @id @default(cuid())
+  kelas     Int
+  hari      String   // Senin, Selasa, Rabu, Kamis, Jumat
+  jamKe     Int      // Urutan jam ke- (1, 2, 3...)
+  waktu     String   // Format: "07:00 - 07:35"
+  mapel     String   // Nama mata pelajaran
+  guru      String?  // Nama guru (opsional, untuk guru mapel)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([kelas, hari, jamKe])
+  @@index([kelas])
+}
+
 // Activity Log for audit trail
 model ActivityLog {
   id        String   @id @default(cuid())

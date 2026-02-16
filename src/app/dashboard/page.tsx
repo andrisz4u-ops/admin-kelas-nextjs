@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { useState, useEffect } from "react"
 
+export const dynamic = 'force-dynamic'
+
 interface SchoolInfo {
     namaSekolah: string
     kepalaSekolah: string

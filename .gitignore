@@ -47,3 +47,5 @@ chrome_profile_notebooklm/
 notebooklm-config.json
 *.txt
 !README.txt
+
+.vercel
