@@ -165,57 +165,54 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     return (
         <div className="min-h-screen flex bg-[#f3f4f6]">
             {/* Sidebar - Turbopack Style */}
-            <aside className={`fixed inset-y-0 left-0 w-64 turbo-sidebar z-50 transition-transform duration-200 lg:translate-x-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
-                <div className="flex flex-col h-full">
+            <aside className={`fixed inset-y-0 left-0 w-64 bg-white z-[60] border-r border-[#e5e7eb] transition-transform duration-300 ease-in-out lg:translate-x-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
+                <div className="flex flex-col h-full overflow-hidden">
                     {/* Header */}
-                    <div className="p-5 border-b border-[var(--border)]">
+                    <div className="p-5 border-b border-[#e5e7eb] flex-shrink-0">
                         <div className="flex items-center gap-3">
                             <img src="/logo-sekolah.png" alt="Logo" className="w-8 h-8 object-contain" />
                             <div>
-                                <h1 className="font-bold text-sm text-[var(--foreground)] tracking-tight">Andris4Edu</h1>
-                                <p className="text-[11px] text-[var(--accents-5)]">
+                                <h1 className="font-bold text-sm text-gray-900 tracking-tight">Andris4Edu</h1>
+                                <p className="text-[11px] text-gray-500">
                                     {isKepsek ? "Kepala Sekolah" : isPengawas ? "Pengawas" : isAdmin ? "Admin" : "Wali Kelas"}
                                 </p>
                             </div>
                         </div>
 
-                        {/* Class Selector - Only for Admin */}
-                        <div className="mt-5">
-                            {/* Class Selector Removed for Admin as requested */}
+                        {/* Class Selector - Role Badges */}
+                        <div className="mt-4">
                             {isGuru && (
-                                <div className="px-3 py-1.5 bg-[var(--accents-2)] rounded-md text-xs font-medium text-[var(--accents-6)] border border-[var(--border)] inline-block">
+                                <div className="px-3 py-1 bg-gray-100 rounded text-xs font-medium text-gray-600 border border-gray-200 inline-block">
                                     Kelas {currentKelas}
                                 </div>
                             )}
                             {isKepsek && (
-                                <div className="px-3 py-1.5 bg-emerald-50 rounded-md text-xs font-medium text-emerald-700 border border-emerald-200 inline-block">
+                                <div className="px-3 py-1 bg-emerald-50 rounded text-xs font-medium text-emerald-700 border border-emerald-200 inline-block">
                                     🏫 SDN 2 Nangerang
                                 </div>
                             )}
                             {isPengawas && (
-                                <div className="px-3 py-1.5 bg-purple-50 rounded-md text-xs font-medium text-purple-700 border border-purple-200 inline-block">
+                                <div className="px-3 py-1 bg-purple-50 rounded text-xs font-medium text-purple-700 border border-purple-200 inline-block">
                                     👁️ Pengawas Sekolah
                                 </div>
                             )}
                         </div>
                     </div>
 
-                    {/* Navigation */}
-                    <nav className="flex-1 px-3 py-4 overflow-y-auto">
-                        {/* Headers embedded in the list */}
+                    {/* Navigation - Ini bagian yang akan di scroll */}
+                    <nav className="flex-1 overflow-y-auto overflow-x-hidden p-3 pb-20 scrollbar-thin scrollbar-thumb-gray-200">
                         {menuItems.map((item, index) => {
                             if (!shouldShowMenuItem(item)) return null;
 
-                            // Render Header
+                            // Render Header Category
                             if (item.isHeader) {
                                 return (
-                                    <p key={index} className="px-3 text-[10px] font-semibold text-[var(--accents-5)] uppercase mb-2 mt-4 first:mt-0 tracking-wider">
+                                    <p key={`header-${index}`} className="px-3 text-[10px] font-bold text-gray-400 uppercase mb-2 mt-5 first:mt-1 tracking-wider">
                                         {item.label}
                                     </p>
                                 )
                             }
 
-                            // Safe check for href/icon before rendering link
                             if (!item.href) return null;
 
                             const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href))
@@ -223,43 +220,43 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                                 <Link
                                     key={item.href}
                                     href={item.href}
-                                    onClick={() => setSidebarOpen(false)}
-                                    className={`flex items-center gap-3 px-3 py-2 rounded-md transition-colors text-sm font-medium ${isActive
-                                        ? "bg-[var(--accents-2)] text-black"
-                                        : "text-[var(--accents-5)] hover:bg-[var(--accents-1)] hover:text-black"
+                                    onClick={() => setSidebarOpen(false)} // Otomatis tutup di mobile
+                                    className={`flex items-center gap-3 px-3 py-2.5 mb-1 rounded-lg transition-colors text-sm font-medium ${isActive
+                                        ? "bg-slate-100 text-slate-900"
+                                        : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
                                         }`}
                                 >
-                                    <Icon name={item.icon || "menu"} className={`w-4 h-4 ${isActive ? 'text-black' : 'text-[var(--accents-4)]'}`} strokeWidth={2} />
+                                    <Icon name={item.icon || "menu"} className={`w-[18px] h-[18px] ${isActive ? 'text-slate-700' : 'text-slate-400'}`} strokeWidth={2} />
                                     <span>{item.label}</span>
                                 </Link>
                             )
                         })}
                     </nav>
 
-                    {/* User Profile - Minimal */}
-                    <div className="p-4 border-t border-[var(--border)]">
+                    {/* User Profile - Posisinya Tetap Di Bawah (Fixed Bottom within Sidebar) */}
+                    <div className="p-4 bg-white/50 backdrop-blur-md border-t border-[#e5e7eb] flex-shrink-0">
                         <div className="flex items-center gap-3 mb-3">
                             {session.user.fotoProfilUrl ? (
                                 <img
                                     src={session.user.fotoProfilUrl}
                                     alt={session.user.name || "User"}
-                                    className="w-8 h-8 rounded-full object-cover border border-[var(--border)]"
+                                    className="w-9 h-9 rounded-full object-cover border border-[#e5e7eb]"
                                 />
                             ) : (
-                                <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-gray-200 to-gray-300 flex items-center justify-center text-xs font-bold text-[var(--accents-6)]">
+                                <div className="w-9 h-9 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-600">
                                     {session.user.name?.charAt(0)}
                                 </div>
                             )}
                             <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium text-[var(--foreground)] truncate">{session.user.name}</p>
-                                <p className="text-[10px] text-[var(--accents-5)] capitalize">{session.user.role}</p>
+                                <p className="text-sm font-semibold text-gray-900 truncate">{session.user.name}</p>
+                                <p className="text-[11px] text-gray-500 capitalize">{session.user.role.replace('_', ' ')}</p>
                             </div>
                         </div>
                         <button
                             onClick={() => signOut({ callbackUrl: "/login" })}
-                            className="w-full flex items-center justify-center gap-2 px-3 py-1.5 text-xs font-medium text-[var(--accents-5)] hover:text-red-500 hover:bg-red-50 rounded-md transition-colors"
+                            className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-semibold text-gray-600 bg-gray-50 border border-gray-200 hover:text-red-600 hover:bg-red-50 hover:border-red-100 rounded-lg transition-all"
                         >
-                            <Icon name="logout" className="w-3.5 h-3.5" />
+                            <Icon name="logout" className="w-[14px] h-[14px]" />
                             Log Out
                         </button>
                     </div>
@@ -268,20 +265,30 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
             {/* Mobile overlay */}
             {sidebarOpen && (
-                <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setSidebarOpen(false)} />
+                <div
+                    className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[50] lg:hidden transition-opacity"
+                    onClick={() => setSidebarOpen(false)}
+                />
             )}
 
-            {/* Mobile menu button */}
-            <button
-                onClick={() => setSidebarOpen(!sidebarOpen)}
-                className="fixed top-4 right-4 z-50 lg:hidden w-10 h-10 rounded-full bg-white shadow-md flex items-center justify-center text-black"
-            >
-                <Icon name={sidebarOpen ? "logout" : "menu"} className="w-5 h-5" />
-            </button>
+            {/* Topbar/Header untuk Mobile - Ganti tombol melayang dengan Header atas murni di mobile */}
+            <div className={`fixed top-0 left-0 right-0 h-16 bg-white border-b border-gray-200 z-[40] flex items-center justify-between px-4 lg:hidden transition-all ${sidebarOpen ? 'blur-sm pointer-events-none' : ''}`}>
+                <div className="flex items-center gap-2">
+                    <img src="/logo-sekolah.png" alt="Logo" className="w-7 h-7 object-contain" />
+                    <span className="font-bold text-gray-800">Andris4Edu</span>
+                </div>
+                <button
+                    onClick={() => setSidebarOpen(true)}
+                    className="p-2 -mr-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+                    aria-label="Buka Menu"
+                >
+                    <Icon name="menu" className="w-6 h-6" />
+                </button>
+            </div>
 
             {/* Main content */}
-            <main className={`flex-1 transition-all duration-200 ${sidebarOpen ? 'lg:pl-64' : 'lg:pl-64'}`}>
-                <div className="max-w-7xl mx-auto p-6 lg:p-10">
+            <main className={`flex-1 flex flex-col min-w-0 transition-all duration-300 lg:ml-64 bg-[#f3f4f6] min-h-screen pt-16 lg:pt-0`}>
+                <div className="flex-1 p-4 md:p-6 lg:p-8 w-full max-w-[1400px] mx-auto overflow-x-hidden">
                     {children}
                 </div>
             </main>
