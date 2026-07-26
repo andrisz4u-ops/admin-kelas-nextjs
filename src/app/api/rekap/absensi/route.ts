@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
-import { getSchoolDays, getSemesterRange, getMonthRange, SCHOOL_CALENDAR_2025_2026 } from "@/lib/schoolCalendar"
+import { getSchoolDays, getSemesterRange, getMonthRange, getCalendar } from "@/lib/schoolCalendar"
 
 // GET rekap absensi
 export async function GET(request: NextRequest) {
@@ -99,8 +99,13 @@ export async function GET(request: NextRequest) {
             }
         })
 
+        // Fetch school settings to know which calendar to use
+        const schoolSettings = await prisma.schoolSettings.findFirst()
+        const currentAcademicYear = schoolSettings?.tahunAjaran || "2026/2027"
+        const calendar = getCalendar(currentAcademicYear)
+
         // Get list of holidays in the period for reference
-        const holidaysInPeriod = SCHOOL_CALENDAR_2025_2026.holidays.filter(h => {
+        const holidaysInPeriod = calendar.holidays.filter(h => {
             const hDate = new Date(h)
             if (type === "month") {
                 // Exact match for month and year

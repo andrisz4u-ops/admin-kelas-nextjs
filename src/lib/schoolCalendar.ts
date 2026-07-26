@@ -83,10 +83,16 @@ export const SCHOOL_CALENDAR_2025_2026 = {
     ]
 }
 
-// Helper function: Check if a date is a holiday
-export function isHoliday(date: Date): boolean {
+export const getCalendar = (tahunAjaran: string) => {
+    if (tahunAjaran === "2026/2027") return SCHOOL_CALENDAR_2026_2027
+    return SCHOOL_CALENDAR_2025_2026
+}
+
+// Helper function: Check if a date is a holiday (defaults to 2026/2027 for new system)
+export function isHoliday(date: Date, tahunAjaran: string = "2026/2027"): boolean {
     const dateStr = date.toISOString().split('T')[0]
-    return SCHOOL_CALENDAR_2025_2026.holidays.includes(dateStr)
+    const calendar = getCalendar(tahunAjaran)
+    return calendar.holidays.includes(dateStr)
 }
 
 // Helper function: Check if a date is a weekend (Saturday or Sunday)
@@ -96,8 +102,73 @@ export function isWeekend(date: Date): boolean {
 }
 
 // Helper function: Check if a date is a school day
-export function isSchoolDay(date: Date): boolean {
-    return !isWeekend(date) && !isHoliday(date)
+export function isSchoolDay(date: Date, tahunAjaran: string = "2026/2027"): boolean {
+    return !isWeekend(date) && !isHoliday(date, tahunAjaran)
+}
+
+export const SCHOOL_CALENDAR_2026_2027 = {
+    academicYear: "2026/2027",
+    semester1: {
+        start: new Date(2026, 6, 13), // Assuming July 13th start based on MPLS
+        end: new Date(2026, 11, 23), // Assuming end before SAS
+    },
+    semester2: {
+        start: new Date(2027, 0, 11), // Assuming Jan 11 start
+        end: new Date(2027, 5, 25), // Assuming late June end
+    },
+    holidays: [
+        "2026-07-01", // LAS
+        "2026-07-06", // LAS
+        "2026-08-17", // LN
+        "2026-08-25", // LN
+        "2026-08-28", // PHBI
+        "2026-12-24", // LN
+        "2026-12-25", // PHBI
+        "2026-12-28", // LN
+        "2027-01-01", // LN
+        "2027-01-04", // LN
+        "2027-02-07", // LN
+        "2027-02-08", // LAR
+        "2027-03-08", // LN
+        "2027-03-09", // L.IDUL FITRI
+        "2027-03-26", // LN
+        "2027-05-01", // LN
+        "2027-05-06", // LN
+        "2027-05-20", // LN
+        "2027-06-01", // LN
+        "2027-06-28", // LAT
+    ],
+    specialDays: [
+        { date: "2026-07-13", title: "MPLS", type: "event" },
+        { date: "2026-07-20", title: "Hari Jadi Purwakarta", type: "event" },
+        { date: "2026-08-14", title: "Hari Pramuka", type: "event" },
+        { date: "2026-09-07", title: "Hari Udara Bersih", type: "event" },
+        { date: "2026-09-18", title: "Hari Bambu Sedunia", type: "event" },
+        { date: "2026-09-21", title: "Penilaian Tengah Semester", type: "exam" },
+        { date: "2026-10-01", title: "Hari Kesaktian Pancasila", type: "event" },
+        { date: "2026-10-28", title: "Hari Sumpah Pemuda", type: "event" },
+        { date: "2026-11-10", title: "Hari Pahlawan", type: "event" },
+        { date: "2026-11-25", title: "Hari Guru Nasional", type: "event" },
+        { date: "2026-12-03", title: "Hari Disabilitas Internasional", type: "event" },
+        { date: "2026-12-09", title: "Hari Anti Korupsi", type: "event" },
+        { date: "2026-12-14", title: "Sumatif Akhir Semester", type: "exam" },
+        { date: "2026-12-21", title: "Penetapan Rapor", type: "event" },
+        { date: "2026-12-23", title: "Pembagian Rapor", type: "semester" },
+        { date: "2027-02-17", title: "Pesantren Kilat", type: "event" },
+        { date: "2027-02-22", title: "Pesantren Kilat", type: "event" },
+        { date: "2027-02-29", title: "Pesantren Kilat", type: "event" },
+        { date: "2027-03-01", title: "Pesantren Kilat", type: "event" },
+        { date: "2027-03-04", title: "Simulasi Ujian", type: "exam" },
+        { date: "2027-03-22", title: "Ujian Sekolah", type: "exam" },
+        { date: "2027-04-22", title: "Hari Bumi", type: "event" },
+        { date: "2027-04-23", title: "Hari Buku Sedunia", type: "event" },
+        { date: "2027-04-26", title: "TKA Susulan", type: "exam" },
+        { date: "2027-05-10", title: "Sumatif Akhir Jenjang", type: "exam" },
+        { date: "2027-05-17", title: "Peringatan Isra Mi'raj", type: "event" },
+        { date: "2027-05-24", title: "OSN", type: "exam" },
+        { date: "2027-06-05", title: "Hari Lingkungan Hidup", type: "event" },
+        { date: "2027-06-07", title: "Sumatif Akhir Tahun", type: "exam" },
+    ]
 }
 
 // Helper function: Get all school days in a date range
@@ -116,19 +187,12 @@ export function getSchoolDays(startDate: Date, endDate: Date): Date[] {
 }
 
 // Helper function: Get semester date range
-export function getSemesterRange(semester: number, year: number): { start: Date; end: Date } {
+export function getSemesterRange(semester: number, year: number, tahunAjaran: string = "2026/2027"): { start: Date; end: Date } {
+    const calendar = getCalendar(tahunAjaran)
     if (semester === 1) {
-        // Semester 1: 14 Juli - 24 Desember
-        return {
-            start: new Date(year, 6, 14),  // 14 Juli
-            end: new Date(year, 11, 24),   // 24 Desember
-        }
+        return calendar.semester1
     } else {
-        // Semester 2: 12 Januari - 26 Juni
-        return {
-            start: new Date(year + 1, 0, 12), // 12 Januari tahun berikutnya
-            end: new Date(year + 1, 5, 26),   // 26 Juni tahun berikutnya
-        }
+        return calendar.semester2
     }
 }
 

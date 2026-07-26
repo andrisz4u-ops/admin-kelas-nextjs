@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { SCHOOL_CALENDAR_2025_2026 } from "@/lib/schoolCalendar"
+import { getCalendar } from "@/lib/schoolCalendar"
 
 // Academic events data
 const academicEvents: Record<string, { title: string; type: 'holiday' | 'exam' | 'event' | 'semester' }[]> = {
@@ -71,8 +71,9 @@ export default function KalenderAkademikPage() {
     const [currentMonth, setCurrentMonth] = useState(today.getMonth())
     const [currentYear, setCurrentYear] = useState(today.getFullYear())
     const [selectedDate, setSelectedDate] = useState<string | null>(null)
+    const [tahunAjaran, setTahunAjaran] = useState("2026/2027") // Default to 2026/2027
 
-    const holidays = SCHOOL_CALENDAR_2025_2026.holidays
+    const holidays = getCalendar(tahunAjaran).holidays
 
     const getDaysInMonth = (month: number, year: number) => {
         return new Date(year, month + 1, 0).getDate()
@@ -97,6 +98,15 @@ export default function KalenderAkademikPage() {
         // Check single date events
         if (academicEvents[dateStr]) {
             events.push(...academicEvents[dateStr])
+        }
+
+        // Add events from dynamic calendar specialDays
+        const specialDays = getCalendar(tahunAjaran).specialDays
+        if (specialDays && Array.isArray(specialDays)) {
+            const dayEvents = specialDays.filter((sd: any) => sd.date === dateStr)
+            dayEvents.forEach((sd: any) => {
+                events.push({ title: sd.title, type: sd.type || 'event' })
+            })
         }
 
         // Check range events
@@ -190,7 +200,6 @@ export default function KalenderAkademikPage() {
         return days
     }
 
-    const [tahunAjaran, setTahunAjaran] = useState("2025/2026")
 
     useEffect(() => {
         fetch("/api/settings/school")
