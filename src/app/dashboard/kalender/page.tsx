@@ -187,6 +187,9 @@ export default function KalenderAkademikPage() {
             )
         }
 
+        return days
+    }
+
     const [tahunAjaran, setTahunAjaran] = useState("2025/2026")
 
     useEffect(() => {
