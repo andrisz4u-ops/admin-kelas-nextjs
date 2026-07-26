@@ -26,19 +26,26 @@ export async function GET(request: NextRequest) {
 
         const today = wibDate // Use WIB date as 'today' base for month calculations
 
-        // Get student count per class
+        // Get student count per class (only active students)
         const studentsByClass = await prisma.siswa.groupBy({
             by: ['kelas'],
+            where: {
+                status: 'aktif',
+                kelas: { in: [1, 2, 3, 4, 5, 6] }
+            },
             _count: { id: true },
             orderBy: { kelas: 'asc' }
         })
 
-        // Get today's attendance summary using date range
         const todayAttendance = await prisma.absensi.findMany({
             where: {
                 tanggal: {
                     gte: startOfDay,
                     lte: endOfDay
+                },
+                siswa: {
+                    status: 'aktif',
+                    kelas: { in: [1, 2, 3, 4, 5, 6] }
                 }
             },
             select: {
@@ -84,12 +91,19 @@ export async function GET(request: NextRequest) {
                 tanggal: {
                     gte: startOfMonth,
                     lte: endOfMonth
-                }
+                },
+                kelas: { in: [1, 2, 3, 4, 5, 6] }
             }
         })
 
         // Get grade summary per class
         const gradesByClass = await prisma.nilai.findMany({
+            where: {
+                siswa: {
+                    status: 'aktif',
+                    kelas: { in: [1, 2, 3, 4, 5, 6] }
+                }
+            },
             select: {
                 nilai: true,
                 siswa: {
