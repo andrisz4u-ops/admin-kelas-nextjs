@@ -5,13 +5,11 @@ import { authOptions } from "@/lib/auth"
 
 export async function GET() {
     try {
-        const session = await getServerSession(authOptions)
-        if (!session) {
-            return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-        }
-
         const settings = await prisma.schoolSettings.findFirst()
-        return NextResponse.json(settings)
+        return NextResponse.json(settings || {
+            namaSekolah: "SDN 2 Nangerang",
+            tahunAjaran: "2025/2026"
+        })
     } catch (error) {
         console.error("Error:", error)
         return NextResponse.json({ error: "Internal server error" }, { status: 500 })

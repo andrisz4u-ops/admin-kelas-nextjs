@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { signIn } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import toast from "react-hot-toast"
@@ -12,90 +12,93 @@ export default function LoginPage() {
     const [loading, setLoading] = useState(false)
     const [username, setUsername] = useState("")
     const [password, setPassword] = useState("")
+    const [tahunAjaran, setTahunAjaran] = useState("2025/2026")
+
+    useEffect(() => {
+        fetch("/api/settings/school")
+            .then(res => res.json())
+            .then(data => {
+                if (data?.tahunAjaran) setTahunAjaran(data.tahunAjaran)
+            })
+            .catch(() => {})
+    }, [])
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         setLoading(true)
 
         try {
-            const result = await signIn("credentials", {
+            const res = await signIn("credentials", {
                 username,
                 password,
                 redirect: false,
             })
 
-            if (result?.error) {
-                toast.error("Username atau password salah!")
+            if (res?.error) {
+                toast.error("Username atau password salah")
             } else {
-                toast.success("Berhasil login!")
+                toast.success("Berhasil masuk!")
                 router.push("/dashboard")
                 router.refresh()
             }
         } catch {
-            toast.error("Terjadi kesalahan!")
+            toast.error("Terjadi kesalahan, coba lagi")
         } finally {
             setLoading(false)
         }
     }
 
     return (
-        <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-blue-50 via-white to-blue-100">
+        <div className="min-h-screen bg-gray-50 flex flex-col justify-center items-center p-4">
             <div className="w-full max-w-md">
                 {/* Logo & Header */}
                 <div className="text-center mb-8">
-                    <div className="inline-flex items-center justify-center w-24 h-24 mb-4">
-                        <img src="/logo-sekolah.png" alt="Logo SDN 2 Nangerang" className="w-full h-full object-contain" />
+                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-black text-white text-2xl font-bold mb-4 shadow-lg">
+                        🏫
                     </div>
-                    <h1 className="text-2xl font-bold text-gray-900">
-                        SDN 2 Nangerang
-                    </h1>
-                    <p className="text-gray-500 mt-1">Administrasi Wali Kelas</p>
+                    <h1 className="text-2xl font-bold text-gray-900">Sistem Informasi Kelas</h1>
+                    <p className="text-sm text-gray-500 mt-1">Masuk untuk mengelola data kelas</p>
                 </div>
 
-                {/* Login Card */}
-                <div className="bg-white border border-gray-200 rounded-2xl shadow-xl shadow-gray-200/50 p-8">
-                    <h2 className="text-xl font-semibold text-gray-900 mb-6 text-center">Masuk ke Akun</h2>
-
+                {/* Form Card */}
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
                     <form onSubmit={handleSubmit} className="space-y-5">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">
                                 Username
                             </label>
                             <input
                                 type="text"
                                 value={username}
                                 onChange={(e) => setUsername(e.target.value)}
-                                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                                 placeholder="Masukkan username"
                                 required
+                                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all text-sm"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm font-semibold text-gray-700 mb-2">
                                 Password
                             </label>
                             <input
                                 type="password"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
-                                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                                placeholder="Masukkan password"
+                                placeholder="••••••••"
                                 required
+                                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all text-sm"
                             />
                         </div>
 
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full py-3 px-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-semibold rounded-xl hover:from-blue-600 hover:to-blue-700 shadow-lg shadow-blue-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="w-full py-3.5 px-4 bg-black text-white font-semibold rounded-xl hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2 transition-all disabled:opacity-50 text-sm shadow-md"
                         >
                             {loading ? (
-                                <span className="flex items-center justify-center gap-2">
-                                    <svg className="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
-                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                    </svg>
+                                <span className="inline-flex items-center gap-2">
+                                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                                     Memproses...
                                 </span>
                             ) : (
@@ -107,7 +110,7 @@ export default function LoginPage() {
 
                 {/* Footer */}
                 <p className="text-center text-gray-400 text-sm mt-6">
-                    Tahun Ajaran 2025/2026
+                    Tahun Ajaran {tahunAjaran}
                 </p>
             </div>
         </div>

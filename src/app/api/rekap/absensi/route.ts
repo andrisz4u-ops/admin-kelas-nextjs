@@ -33,9 +33,9 @@ export async function GET(request: NextRequest) {
             endDate = range.end
         }
 
-        // Get all students in the class
+        // Get all active students in the class
         const students = await prisma.siswa.findMany({
-            where: { kelas },
+            where: { kelas, status: "aktif" },
             orderBy: { nama: "asc" },
             select: { id: true, nis: true, nama: true },
         })

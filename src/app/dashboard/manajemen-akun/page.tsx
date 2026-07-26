@@ -61,6 +61,16 @@ export default function ManajemenAkunPage() {
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
 
+    // Delete confirmation state
+    const [deleteConfirm, setDeleteConfirm] = useState<{
+        show: boolean
+        accountIndex: number
+        accountId: string
+        accountName: string
+        accountRole: string
+    } | null>(null)
+    const [deleting, setDeleting] = useState(false)
+
     useEffect(() => {
         if (session && !isAdmin) {
             toast.error("Akses ditolak. Hanya admin.")
@@ -135,7 +145,7 @@ export default function ManajemenAkunPage() {
             const res = await fetch("/api/settings/wali-kelas", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ waliKelas }),
+                body: JSON.stringify({ waliKelasData: waliKelas }),
             })
             if (res.ok) toast.success("Data wali kelas berhasil disimpan!")
             else toast.error("Gagal menyimpan")
@@ -167,7 +177,48 @@ export default function ManajemenAkunPage() {
             toast.error("Akun ini tidak bisa dihapus")
             return
         }
-        setSpecialAccounts(prev => prev.filter((_, i) => i !== index))
+        // If account has ID (already in database), show confirm dialog
+        if (acc.id) {
+            setDeleteConfirm({
+                show: true,
+                accountIndex: index,
+                accountId: acc.id,
+                accountName: acc.name || "(tanpa nama)",
+                accountRole: acc.role,
+            })
+        } else {
+            // New account (not yet saved), just remove from UI
+            setSpecialAccounts(prev => prev.filter((_, i) => i !== index))
+        }
+    }
+
+    const handleDeleteAccount = async () => {
+        if (!deleteConfirm) return
+        setDeleting(true)
+        try {
+            if (deleteConfirm.accountId) {
+                const res = await fetch("/api/settings/special-accounts", {
+                    method: "DELETE",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ id: deleteConfirm.accountId }),
+                })
+                const result = await res.json()
+                if (res.ok) {
+                    toast.success(result.message || "Akun berhasil dihapus")
+                    setSpecialAccounts(prev => prev.filter((_, i) => i !== deleteConfirm.accountIndex))
+                } else {
+                    toast.error(result.error || "Gagal menghapus akun")
+                    return
+                }
+            } else {
+                setSpecialAccounts(prev => prev.filter((_, i) => i !== deleteConfirm.accountIndex))
+            }
+            setDeleteConfirm(null)
+        } catch {
+            toast.error("Terjadi kesalahan")
+        } finally {
+            setDeleting(false)
+        }
     }
 
     const handleSaveSpecial = async () => {
@@ -255,9 +306,22 @@ export default function ManajemenAkunPage() {
                 </Tab>
             </div>
 
-            {/* Tab Content */}
+            {/* Tab Content: Wali Kelas */}
             {activeTab === 'wali' && (
                 <div className="space-y-4">
+                    {/* Panduan skenario */}
+                    <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg flex gap-3">
+                        <span className="text-blue-500 text-xl mt-0.5">ℹ️</span>
+                        <div className="text-sm text-blue-800">
+                            <p className="font-semibold mb-1">Panduan Pergantian Wali Kelas</p>
+                            <ul className="space-y-0.5 text-xs list-disc ml-4 text-blue-700">
+                                <li><strong>Guru Pensiun / Mutasi:</strong> Ganti nama, NIP, dan username pada kelas yang bersangkutan → klik Simpan</li>
+                                <li><strong>Guru Baru:</strong> Isi nama baru, username baru, dan password baru pada slot kelas → klik Simpan</li>
+                                <li>Slot kelas 1–6 selalu tersedia. Password dikosongkan = tidak berubah.</li>
+                            </ul>
+                        </div>
+                    </div>
+
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {waliKelas.map((w) => (
                             <div key={w.kelas} className="turbo-card p-5 hover:shadow-md transition-all">
@@ -331,8 +395,22 @@ export default function ManajemenAkunPage() {
                 </div>
             )}
 
+            {/* Tab Content: Akun Khusus */}
             {activeTab === 'special' && (
                 <div className="space-y-4">
+                    {/* Panduan skenario akun khusus */}
+                    <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg flex gap-3">
+                        <span className="text-amber-500 text-xl mt-0.5">ℹ️</span>
+                        <div className="text-sm text-amber-800">
+                            <p className="font-semibold mb-1">Panduan Guru Mapel / Staff</p>
+                            <ul className="space-y-0.5 text-xs list-disc ml-4 text-amber-700">
+                                <li><strong>Guru Baru:</strong> Klik &quot;+ Guru Mapel&quot; atau &quot;+ Staff&quot; → isi data → Simpan</li>
+                                <li><strong>Guru Pensiun / Mutasi:</strong> Klik tombol <span className="font-mono bg-red-100 text-red-700 px-1 rounded">🗑️ Hapus</span> pada kartu guru → konfirmasi → akun terhapus dari sistem</li>
+                                <li><strong>Kepala Sekolah / Pengawas:</strong> Edit nama dan password langsung → tidak bisa dihapus</li>
+                            </ul>
+                        </div>
+                    </div>
+
                     {/* Stats Cards */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                         {['kepsek', 'pengawas', 'guru_mapel', 'guru'].map(role => {
@@ -370,9 +448,10 @@ export default function ManajemenAkunPage() {
                                         {acc.role !== "kepsek" && acc.role !== "pengawas" && (
                                             <button
                                                 onClick={() => removeSpecialAccount(index)}
-                                                className="text-red-500 hover:text-red-700 text-sm"
+                                                className="text-xs px-2 py-1 bg-red-50 border border-red-200 text-red-600 rounded hover:bg-red-100 transition-colors"
+                                                title="Hapus akun ini dari sistem"
                                             >
-                                                ✕
+                                                🗑️ Hapus
                                             </button>
                                         )}
                                     </div>
@@ -459,6 +538,7 @@ export default function ManajemenAkunPage() {
                 </div>
             )}
 
+            {/* Tab Content: Nama Mapel */}
             {activeTab === 'mapel' && (
                 <div className="space-y-4">
                     {/* Class Selector */}
@@ -515,6 +595,63 @@ export default function ManajemenAkunPage() {
                                 className="h-11 px-8 bg-black text-white rounded-full font-medium shadow-lg hover:bg-gray-800 transition-all disabled:opacity-50"
                             >
                                 {saving ? "Menyimpan..." : `💾 Simpan Mapel Kelas ${mapelKelas}`}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal Konfirmasi Hapus Akun */}
+            {deleteConfirm?.show && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
+                        <div className="p-5 border-b border-[var(--border)] bg-red-50 flex items-center gap-3">
+                            <span className="text-2xl">⚠️</span>
+                            <div>
+                                <h2 className="text-lg font-bold text-red-800">Hapus Akun Guru</h2>
+                                <p className="text-xs text-red-600">Tindakan ini tidak dapat dibatalkan</p>
+                            </div>
+                        </div>
+
+                        <div className="p-5 space-y-4">
+                            <p className="text-sm text-[var(--foreground)]">
+                                Anda akan menghapus akun <strong>{deleteConfirm.accountName}</strong> dari sistem.
+                            </p>
+
+                            <div className="p-3 bg-red-50 border border-red-200 rounded-lg space-y-1.5">
+                                <p className="text-xs font-semibold text-red-700">Yang akan terjadi:</p>
+                                <ul className="text-xs text-red-700 list-disc ml-4 space-y-0.5">
+                                    <li>Akun login guru ini akan dihapus permanen</li>
+                                    <li>Data absensi guru (jika ada) juga ikut terhapus</li>
+                                    <li>Guru tidak bisa lagi masuk ke sistem</li>
+                                </ul>
+                            </div>
+
+                            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                <p className="text-xs text-blue-700">
+                                    💡 <strong>Untuk guru pensiun / mutasi:</strong> Hapus akun ini, lalu tambahkan guru pengganti dengan klik &quot;+ Guru Mapel&quot; atau &quot;+ Staff&quot;.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="p-4 border-t border-[var(--border)] flex justify-end gap-3 bg-[var(--accents-1)]">
+                            <button
+                                onClick={() => setDeleteConfirm(null)}
+                                disabled={deleting}
+                                className="px-4 py-2 text-sm font-medium text-[var(--accents-6)] hover:text-black disabled:opacity-50"
+                            >
+                                Batal
+                            </button>
+                            <button
+                                onClick={handleDeleteAccount}
+                                disabled={deleting}
+                                className="px-5 py-2 bg-red-600 text-white rounded-lg text-sm font-semibold hover:bg-red-700 disabled:opacity-50 transition-colors flex items-center gap-2"
+                            >
+                                {deleting ? (
+                                    <><span className="animate-spin inline-block">⏳</span> Menghapus...</>
+                                ) : (
+                                    <>🗑️ Ya, Hapus Permanen</>
+                                )}
                             </button>
                         </div>
                     </div>

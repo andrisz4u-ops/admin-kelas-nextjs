@@ -35,6 +35,7 @@ export default function PrincipalDashboard() {
     const [overview, setOverview] = useState<Overview | null>(null)
     const [classSummary, setClassSummary] = useState<ClassSummary[]>([])
     const [loading, setLoading] = useState(true)
+    const [schoolInfo, setSchoolInfo] = useState<{ namaSekolah?: string; tahunAjaran?: string } | null>(null)
 
     useEffect(() => {
         if (!canAccess) {
@@ -44,11 +45,18 @@ export default function PrincipalDashboard() {
 
         const fetchData = async () => {
             try {
-                const res = await fetch("/api/principal/overview")
-                if (res.ok) {
-                    const data = await res.json()
+                const [overviewRes, schoolRes] = await Promise.all([
+                    fetch("/api/principal/overview"),
+                    fetch("/api/settings/school")
+                ])
+                if (overviewRes.ok) {
+                    const data = await overviewRes.json()
                     setOverview(data.overview)
                     setClassSummary(data.classSummary)
+                }
+                if (schoolRes.ok) {
+                    const sData = await schoolRes.json()
+                    setSchoolInfo(sData)
                 }
             } catch {
                 toast.error("Gagal memuat data")
@@ -79,7 +87,7 @@ export default function PrincipalDashboard() {
                         Dashboard Kepala Sekolah 🏫
                     </h1>
                     <p className="text-sm text-[var(--accents-5)] mt-1">
-                        Monitoring kehadiran dan pembelajaran seluruh kelas
+                        {schoolInfo?.namaSekolah || "SDN 2 Nangerang"} • Tahun Ajaran {schoolInfo?.tahunAjaran || "2025/2026"}
                     </p>
                 </div>
                 {overview && (

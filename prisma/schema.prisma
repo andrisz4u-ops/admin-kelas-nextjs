@@ -49,6 +49,8 @@ model Siswa {
   alamat       String?
   namaOrtu     String?
   noHp         String?
+  status       String    @default("aktif") // "aktif" atau "alumni"
+  tahunLulus   String?   // Tahun ajaran kelulusan, e.g. "2025/2026"
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
   absensi      Absensi[]

@@ -48,6 +48,16 @@ export default function RekapAbsensiPage() {
     const [type, setType] = useState<"month" | "semester">("month")
     const [month, setMonth] = useState(new Date().getMonth())
     const [year, setYear] = useState(new Date().getFullYear())
+    const [tahunAjaran, setTahunAjaran] = useState("2025/2026")
+
+    useEffect(() => {
+        fetch("/api/settings/school")
+            .then(res => res.json())
+            .then(data => {
+                if (data?.tahunAjaran) setTahunAjaran(data.tahunAjaran)
+            })
+            .catch(() => {})
+    }, [])
     const [semester, setSemester] = useState(2) // Semester 2 mulai 12 Jan 2026
 
     useEffect(() => {
@@ -498,7 +508,9 @@ export default function RekapAbsensiPage() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-bold tracking-tight text-[var(--foreground)]">Rekapitulasi Kehadiran</h1>
-                    <p className="text-sm text-[var(--accents-5)] mt-1">Berdasarkan Kalender Pendidikan Kab. Purwakarta 2025/2026</p>
+                    <p className="text-sm text-[var(--accents-5)] mt-1">
+                        Berdasarkan Kalender Pendidikan Kab. Purwakarta (Tahun Ajaran {tahunAjaran})
+                    </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                     {/* Class selector */}

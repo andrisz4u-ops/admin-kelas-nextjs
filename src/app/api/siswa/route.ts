@@ -13,10 +13,15 @@ export async function GET(request: NextRequest) {
 
         const { searchParams } = new URL(request.url)
         const kelasParam = searchParams.get("kelas")
+        const statusParam = searchParams.get("status") || "aktif" // default: hanya aktif
 
         const whereClause: any = {}
         if (kelasParam) {
             whereClause.kelas = parseInt(kelasParam)
+        }
+        // Filter by status: "aktif", "alumni", or "all"
+        if (statusParam !== "all") {
+            whereClause.status = statusParam
         }
 
         const siswa = await prisma.siswa.findMany({

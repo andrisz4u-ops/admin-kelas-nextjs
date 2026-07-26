@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { SCHOOL_CALENDAR_2025_2026 } from "@/lib/schoolCalendar"
 
 // Academic events data
@@ -187,8 +187,16 @@ export default function KalenderAkademikPage() {
             )
         }
 
-        return days
-    }
+    const [tahunAjaran, setTahunAjaran] = useState("2025/2026")
+
+    useEffect(() => {
+        fetch("/api/settings/school")
+            .then(res => res.json())
+            .then(data => {
+                if (data?.tahunAjaran) setTahunAjaran(data.tahunAjaran)
+            })
+            .catch(() => {})
+    }, [])
 
     const selectedEvents = selectedDate ? getEventsForDate(selectedDate) : []
     const selectedDateObj = selectedDate ? new Date(selectedDate) : null
@@ -201,7 +209,7 @@ export default function KalenderAkademikPage() {
                     Kalender Akademik 📅
                 </h1>
                 <p className="text-sm text-[var(--accents-5)] mt-1">
-                    Kalender Pendidikan Kab. Purwakarta Tahun Ajaran 2025/2026
+                    Kalender Pendidikan Kab. Purwakarta Tahun Ajaran {tahunAjaran}
                 </p>
             </div>
 

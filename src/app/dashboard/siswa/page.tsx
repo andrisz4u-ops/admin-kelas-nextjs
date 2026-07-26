@@ -14,6 +14,8 @@ interface Siswa {
     namaOrtu?: string
     noHp?: string
     kelas?: number  // For multi-class import
+    status?: string  // "aktif" atau "alumni"
+    tahunLulus?: string  // Tahun kelulusan untuk alumni
 }
 
 export default function SiswaPage() {
@@ -29,6 +31,7 @@ export default function SiswaPage() {
     const [editingSiswa, setEditingSiswa] = useState<Siswa | null>(null)
     const [importData, setImportData] = useState<Siswa[]>([])
     const [importAllClasses, setImportAllClasses] = useState(false)  // Multi-class import mode
+    const [showAlumni, setShowAlumni] = useState(false)  // Toggle tampilan alumni
 
     // Guru hanya bisa akses kelasnya sendiri
     useEffect(() => {
@@ -40,7 +43,11 @@ export default function SiswaPage() {
     const fetchSiswa = useCallback(async () => {
         try {
             setLoading(true)
-            const res = await fetch(`/api/siswa?kelas=${kelas}`, { cache: "no-store" })
+            const statusParam = showAlumni ? "alumni" : "aktif"
+            const url = showAlumni
+                ? `/api/siswa?status=${statusParam}`
+                : `/api/siswa?kelas=${kelas}&status=${statusParam}`
+            const res = await fetch(url, { cache: "no-store" })
             const data = await res.json()
             setSiswa(data)
         } catch {
@@ -48,7 +55,7 @@ export default function SiswaPage() {
         } finally {
             setLoading(false)
         }
-    }, [kelas])
+    }, [kelas, showAlumni])
 
     useEffect(() => {
         fetchSiswa()
@@ -233,14 +240,30 @@ export default function SiswaPage() {
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold tracking-tight text-[var(--foreground)]">Data Siswa Kelas {kelas}</h1>
+                    <h1 className="text-2xl font-bold tracking-tight text-[var(--foreground)]">
+                        {showAlumni ? "🎓 Data Alumni" : `Data Siswa Kelas ${kelas}`}
+                    </h1>
                     <p className="text-sm text-[var(--accents-5)] mt-1">
-                        {isAdmin ? "Kelola data siswa" : "Lihat data siswa (hanya baca)"}
+                        {showAlumni
+                            ? "Daftar siswa yang telah lulus"
+                            : isAdmin ? "Kelola data siswa" : "Lihat data siswa (hanya baca)"}
                     </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                    {/* Dropdown kelas hanya untuk admin */}
-                    {isAdmin ? (
+                    {/* Toggle alumni */}
+                    <button
+                        onClick={() => setShowAlumni(!showAlumni)}
+                        className={`h-9 px-3 border rounded-md text-sm font-medium transition-colors flex items-center gap-1.5 ${
+                            showAlumni
+                                ? "bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100"
+                                : "bg-white border-[var(--border)] text-[var(--foreground)] hover:bg-[var(--accents-1)]"
+                        }`}
+                    >
+                        🎓 {showAlumni ? "Lihat Siswa Aktif" : "Lihat Alumni"}
+                    </button>
+
+                    {/* Dropdown kelas hanya untuk admin dan bukan mode alumni */}
+                    {isAdmin && !showAlumni ? (
                         <div className="relative">
                             <select
                                 value={kelas}
@@ -256,13 +279,13 @@ export default function SiswaPage() {
                             </div>
                         </div>
                     ) : (
-                        <span className="h-9 px-3 flex items-center bg-[var(--accents-2)] border border-[var(--border)] rounded-md text-sm font-medium text-[var(--foreground)]">
-                            Kelas {kelas}
-                        </span>
-                    )}
+                            <span className="h-9 px-3 flex items-center bg-[var(--accents-2)] border border-[var(--border)] rounded-md text-sm font-medium text-[var(--foreground)]">
+                                Kelas {kelas}
+                            </span>
+                        )}
 
-                    {/* Tombol tambah, import hanya untuk admin */}
-                    {isAdmin && (
+                    {/* Tombol tambah, import hanya untuk admin dan mode aktif */}
+                    {isAdmin && !showAlumni && (
                         <>
                             <button onClick={() => { setEditingSiswa(null); setShowModal(true) }} className="h-9 px-3 bg-black text-white rounded-md text-sm font-medium hover:bg-gray-800 transition-colors">
                                 + Tambah
@@ -292,31 +315,51 @@ export default function SiswaPage() {
                         <thead>
                             <tr className="border-b border-[var(--border)] bg-[var(--accents-1)]">
                                 <th className="px-4 py-3 font-medium text-[var(--accents-5)] w-12">No</th>
+                                {showAlumni && <th className="px-4 py-3 font-medium text-[var(--accents-5)] w-16">Kelas</th>}
                                 <th className="px-4 py-3 font-medium text-[var(--accents-5)] w-24">NIS</th>
                                 <th className="px-4 py-3 font-medium text-[var(--accents-5)]">Nama Siswa</th>
                                 <th className="px-4 py-3 font-medium text-[var(--accents-5)] w-16">L/P</th>
-                                <th className="px-4 py-3 font-medium text-[var(--accents-5)]">Alamat</th>
-                                <th className="px-4 py-3 font-medium text-[var(--accents-5)]">Nama Ortu</th>
-                                <th className="px-4 py-3 font-medium text-[var(--accents-5)]">No. HP</th>
-                                {isAdmin && <th className="px-4 py-3 font-medium text-[var(--accents-5)] text-right">Aksi</th>}
+                                {showAlumni ? (
+                                    <th className="px-4 py-3 font-medium text-[var(--accents-5)]">Tahun Lulus</th>
+                                ) : (
+                                    <>
+                                        <th className="px-4 py-3 font-medium text-[var(--accents-5)]">Alamat</th>
+                                        <th className="px-4 py-3 font-medium text-[var(--accents-5)]">Nama Ortu</th>
+                                        <th className="px-4 py-3 font-medium text-[var(--accents-5)]">No. HP</th>
+                                    </>
+                                )}
+                                {isAdmin && !showAlumni && <th className="px-4 py-3 font-medium text-[var(--accents-5)] text-right">Aksi</th>}
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-[var(--border)]">
                             {loading ? (
-                                <tr><td colSpan={isAdmin ? 8 : 7} className="px-4 py-12 text-center text-[var(--accents-5)]">Memuat data...</td></tr>
+                                <tr><td colSpan={isAdmin && !showAlumni ? 8 : 6} className="px-4 py-12 text-center text-[var(--accents-5)]">Memuat data...</td></tr>
                             ) : siswa.length === 0 ? (
-                                <tr><td colSpan={isAdmin ? 8 : 7} className="px-4 py-12 text-center text-[var(--accents-5)]">Belum ada data siswa</td></tr>
+                                <tr><td colSpan={isAdmin && !showAlumni ? 8 : 6} className="px-4 py-12 text-center text-[var(--accents-5)]">
+                                    {showAlumni ? "Belum ada data alumni" : "Belum ada data siswa"}
+                                </td></tr>
                             ) : (
                                 siswa.map((s, i) => (
                                     <tr key={s.id} className="hover:bg-[var(--accents-1)] transition-colors group">
                                         <td className="px-4 py-3 text-[var(--accents-5)]">{i + 1}</td>
+                                        {showAlumni && <td className="px-4 py-3 font-semibold text-amber-600">{s.kelas}</td>}
                                         <td className="px-4 py-3 text-[var(--foreground)] font-medium tabular-nums">{s.nis}</td>
                                         <td className="px-4 py-3 text-[var(--foreground)] font-medium">{s.nama}</td>
                                         <td className="px-4 py-3 text-[var(--accents-6)]">{s.jenisKelamin}</td>
-                                        <td className="px-4 py-3 text-[var(--accents-5)] truncate max-w-[150px]">{s.alamat || "-"}</td>
-                                        <td className="px-4 py-3 text-[var(--accents-5)] truncate max-w-[150px]">{s.namaOrtu || "-"}</td>
-                                        <td className="px-4 py-3 text-[var(--accents-5)] font-medium tabular-nums">{s.noHp || "-"}</td>
-                                        {isAdmin && (
+                                        {showAlumni ? (
+                                            <td className="px-4 py-3">
+                                                <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded text-xs font-medium">
+                                                    Lulus {s.tahunLulus || "-"}
+                                                </span>
+                                            </td>
+                                        ) : (
+                                            <>
+                                                <td className="px-4 py-3 text-[var(--accents-5)] truncate max-w-[150px]">{s.alamat || "-"}</td>
+                                                <td className="px-4 py-3 text-[var(--accents-5)] truncate max-w-[150px]">{s.namaOrtu || "-"}</td>
+                                                <td className="px-4 py-3 text-[var(--accents-5)] font-medium tabular-nums">{s.noHp || "-"}</td>
+                                            </>
+                                        )}
+                                        {isAdmin && !showAlumni && (
                                             <td className="px-4 py-3 text-right">
                                                 <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                                     <button onClick={() => { setEditingSiswa(s); setShowModal(true) }} className="text-[var(--accents-5)] hover:text-black">Edit</button>

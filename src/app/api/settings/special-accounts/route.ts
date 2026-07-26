@@ -101,3 +101,38 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Internal server error" }, { status: 500 })
     }
 }
+
+// DELETE permanently remove an account
+export async function DELETE(request: NextRequest) {
+    try {
+        const session = await getServerSession(authOptions)
+        if (!session || session.user.role !== "admin") {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+        }
+
+        const { id } = await request.json()
+
+        if (!id) {
+            return NextResponse.json({ error: "ID akun harus disertakan" }, { status: 400 })
+        }
+
+        // Fetch the user to validate
+        const user = await prisma.user.findUnique({ where: { id } })
+        if (!user) {
+            return NextResponse.json({ error: "Akun tidak ditemukan" }, { status: 404 })
+        }
+
+        // Protect admin account
+        if (user.username === "admin" || user.role === "admin") {
+            return NextResponse.json({ error: "Akun admin tidak dapat dihapus" }, { status: 403 })
+        }
+
+        // Delete the user (cascade will handle activity logs)
+        await prisma.user.delete({ where: { id } })
+
+        return NextResponse.json({ success: true, message: `Akun ${user.name} berhasil dihapus` })
+    } catch (error) {
+        console.error("Error deleting account:", error)
+        return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    }
+}
