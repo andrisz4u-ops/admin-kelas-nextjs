@@ -460,14 +460,18 @@ export default function PengaturanPage() {
 
                             {/* Naik Kelas */}
                             <div className="p-5 bg-emerald-50 rounded-xl border border-emerald-200 mb-4">
-                                <h3 className="font-semibold text-emerald-900 mb-2">🎓 Proses Naik Kelas</h3>
-                                <p className="text-sm text-emerald-700 mb-3">Naikkan semua siswa ke kelas berikutnya. Kelas 6 akan lulus.</p>
+                                <h3 className="font-semibold text-emerald-900 mb-2">🎓 Proses Kenaikan Kelas & Arsip Alumni</h3>
+                                <p className="text-sm text-emerald-700 mb-3">
+                                    Proses kenaikan kelas yang aman dengan pengarsipan otomatis alumni (tanpa menghapus data) dikelola pada tab Kenaikan Kelas.
+                                </p>
                                 <button
-                                    onClick={() => handleDbAction("naik-kelas", "PERHATIAN: Semua siswa akan naik kelas.\n\nKelas 1→2, 2→3, dst.\nKelas 6 → LULUS (data dihapus)\n\nLanjutkan?")}
-                                    disabled={saving}
-                                    className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 disabled:opacity-50"
+                                    onClick={() => {
+                                        setExpanded(prev => ({ ...prev, kenaikanKelas: true }))
+                                        if (!kenaikanPreview) fetchKenaikanPreview()
+                                    }}
+                                    className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700"
                                 >
-                                    {saving ? "Memproses..." : "Jalankan Naik Kelas"}
+                                    Buka Menu Kenaikan Kelas →
                                 </button>
                             </div>
 

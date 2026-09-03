@@ -33,19 +33,21 @@ const DAYS = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat"]
 export default function JadwalPage() {
     const { data: session } = useSession()
     const isAdmin = session?.user?.role === "admin"
-    const isGuru = session?.user?.role === "guru" || session?.user?.role === "guru_mapel"
+    const isGuruMapel = session?.user?.role === "guru_mapel"
+    const isGuru = session?.user?.role === "guru" || isGuruMapel
+    const canSelectKelas = isAdmin || isGuruMapel
     const userKelas = session?.user?.kelas
 
-    const [kelas, setKelas] = useState<number>(userKelas || 5)
+    const [kelas, setKelas] = useState<number>(userKelas || 1)
 
-    // Admin defaults to class 1 if not set, Guru defaults to their class
+    // Lock kelas untuk wali kelas biasa, izinkan admin dan guru_mapel pilih kelas
     useEffect(() => {
-        if (!isAdmin && userKelas) {
+        if (!canSelectKelas && userKelas) {
             setKelas(userKelas)
-        } else if (isAdmin && !kelas) {
-            setKelas(1)
+        } else if (!kelas) {
+            setKelas(userKelas || 1)
         }
-    }, [isAdmin, userKelas, kelas])
+    }, [canSelectKelas, userKelas, kelas])
 
 
     const [schedule, setSchedule] = useState<ScheduleItem[]>([])
@@ -196,7 +198,7 @@ export default function JadwalPage() {
                     <p className="text-sm text-[var(--accents-5)] mt-1">Atur jadwal mata pelajaran mingguan (Senin - Jumat)</p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                    {isAdmin ? (
+                    {canSelectKelas ? (
                         <div className="relative">
                             <select
                                 value={kelas}

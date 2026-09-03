@@ -1,9 +1,18 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { getServerSession } from "next-auth"
+import { authOptions } from "@/lib/auth"
 import bcrypt from "bcryptjs"
+
+export const dynamic = 'force-dynamic'
 
 export async function GET() {
     try {
+        const session = await getServerSession(authOptions)
+        if (!session || session.user?.role !== "admin") {
+            return NextResponse.json({ error: "Unauthorized. Hanya admin yang berhak menjalankan seeding manual." }, { status: 401 })
+        }
+
         console.log("Starting manual seed...")
 
         // 1. Update Kepala Sekolah

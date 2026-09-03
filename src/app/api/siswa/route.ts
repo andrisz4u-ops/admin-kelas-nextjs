@@ -14,19 +14,28 @@ export async function GET(request: NextRequest) {
         const { searchParams } = new URL(request.url)
         const kelasParam = searchParams.get("kelas")
         const statusParam = searchParams.get("status") || "aktif" // default: hanya aktif
+        const tahunLulusParam = searchParams.get("tahunLulus")
 
         const whereClause: any = {}
-        if (kelasParam) {
+        // If searching specifically for alumni, don't restrict to kelas 1-6 unless explicitly passed
+        if (kelasParam && statusParam !== "alumni") {
+            whereClause.kelas = parseInt(kelasParam)
+        } else if (kelasParam && statusParam === "alumni") {
             whereClause.kelas = parseInt(kelasParam)
         }
+
         // Filter by status: "aktif", "alumni", or "all"
         if (statusParam !== "all") {
             whereClause.status = statusParam
         }
 
+        if (tahunLulusParam && tahunLulusParam !== "all") {
+            whereClause.tahunLulus = tahunLulusParam
+        }
+
         const siswa = await prisma.siswa.findMany({
             where: whereClause,
-            orderBy: { nama: "asc" },
+            orderBy: [{ nama: "asc" }],
         })
 
         return NextResponse.json(siswa)
@@ -44,8 +53,16 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
         }
 
+        if (session.user.role !== "admin") {
+            return NextResponse.json({ error: "Hanya admin yang dapat menambah siswa" }, { status: 403 })
+        }
+
         const body = await request.json()
         const { nis, nama, jenisKelamin, kelas, alamat, namaOrtu, noHp } = body
+
+        if (!nis || !nama) {
+            return NextResponse.json({ error: "NIS dan Nama wajib diisi" }, { status: 400 })
+        }
 
         // Check if NIS already exists
         const existing = await prisma.siswa.findUnique({ where: { nis } })
@@ -53,15 +70,17 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: "NIS sudah terdaftar" }, { status: 400 })
         }
 
+        const parsedKelas = parseInt(kelas) || 1
         const siswa = await prisma.siswa.create({
             data: {
-                nis,
-                nama,
-                jenisKelamin,
-                kelas: parseInt(kelas),
-                alamat,
-                namaOrtu,
-                noHp,
+                nis: String(nis).trim(),
+                nama: String(nama).trim(),
+                jenisKelamin: String(jenisKelamin || "L").toUpperCase(),
+                kelas: parsedKelas,
+                alamat: alamat || null,
+                namaOrtu: namaOrtu || null,
+                noHp: noHp || null,
+                status: "aktif"
             },
         })
 

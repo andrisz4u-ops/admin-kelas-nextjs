@@ -7,6 +7,8 @@ import ExcelJS from "exceljs"
 import fs from "fs"
 import path from "path"
 
+export const dynamic = 'force-dynamic'
+
 export async function POST(request: NextRequest) {
     try {
         const session = await getServerSession(authOptions)

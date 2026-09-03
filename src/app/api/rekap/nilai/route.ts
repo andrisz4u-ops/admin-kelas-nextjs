@@ -4,6 +4,8 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { getMapelByKelas } from "@/lib/mapelConfig"
 
+export const dynamic = 'force-dynamic'
+
 const jenisNilaiList = ["UH1", "UH2", "UH3", "UTS", "UAS"]
 
 // GET rekap nilai
@@ -19,9 +21,9 @@ export async function GET(request: NextRequest) {
         const semester = parseInt(searchParams.get("semester") || "2")
         const mapel = searchParams.get("mapel") || "" // Optional: specific mapel
 
-        // Get all students in the class
+        // Get all active students in the class
         const students = await prisma.siswa.findMany({
-            where: { kelas },
+            where: { kelas, status: "aktif" },
             orderBy: { nama: "asc" },
             select: { id: true, nis: true, nama: true },
         })
@@ -32,9 +34,9 @@ export async function GET(request: NextRequest) {
         // For simplicity, we'll just fetch all nilai and let the user filter by semester in the UI
         // In a more complex system, nilai would have a semester field
 
-        // Get all nilai for the class
-        const whereClause: { siswa: { kelas: number }; mapel?: string } = {
-            siswa: { kelas },
+        // Get all nilai for active students in the class
+        const whereClause: { siswa: { kelas: number; status: string }; mapel?: string } = {
+            siswa: { kelas, status: "aktif" },
         }
         if (mapel) {
             whereClause.mapel = mapel

@@ -170,26 +170,10 @@ export async function POST(request: NextRequest) {
             }
 
             case "naik-kelas": {
-                // Promote all students to next grade
-                // Students in grade 6 will be "graduated" (deleted or marked)
-
-                // First, delete grade 6 students (they graduate)
-                const graduated = await prisma.siswa.deleteMany({
-                    where: { kelas: 6 }
-                })
-
-                // Then promote grades 1-5 to 2-6
-                for (let grade = 5; grade >= 1; grade--) {
-                    await prisma.siswa.updateMany({
-                        where: { kelas: grade },
-                        data: { kelas: grade + 1 }
-                    })
-                }
-
                 return NextResponse.json({
-                    success: true,
-                    message: `Proses naik kelas berhasil. ${graduated.count} siswa kelas 6 telah lulus.`
-                })
+                    success: false,
+                    error: "Aksi ini telah dinonaktifkan demi keamanan data. Silakan gunakan menu resmi Kenaikan Kelas untuk pengarsipan alumni yang aman."
+                }, { status: 400 })
             }
 
             case "clean-duplicate-users": {

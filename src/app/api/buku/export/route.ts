@@ -4,6 +4,8 @@ import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import ExcelJS from "exceljs"
 
+export const dynamic = 'force-dynamic'
+
 // GET - Export buku to Excel
 export async function GET() {
     try {

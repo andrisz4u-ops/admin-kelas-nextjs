@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import toast from "react-hot-toast"
+import { getWIBDateString, getWIBMonthString } from "@/lib/dateUtils"
 
 interface TeacherAttendance {
     userId: string
@@ -18,8 +19,15 @@ interface Teacher {
     id: string
     name: string
     role: string
+    kelas: number | null
 }
 
+const getRoleBadge = (role: string, kelas: number | null) => {
+    if (role === "admin") return "Administrator"
+    if (role === "guru_mapel") return "Guru Mapel"
+    if (kelas) return `Wali Kelas ${kelas}`
+    return "Wali Kelas"
+}
 
 function getRoleLabel(teacher: Teacher) {
     if (teacher.name.toLowerCase().includes("holid")) return "Penjaga Sekolah"
@@ -35,8 +43,8 @@ export default function AbsensiGuruPage() {
     const router = useRouter()
     const isAdmin = session?.user?.role === "admin"
 
-    const [tanggal, setTanggal] = useState(new Date().toISOString().split("T")[0])
-    const [bulan, setBulan] = useState(new Date().toISOString().slice(0, 7))
+    const [tanggal, setTanggal] = useState(getWIBDateString())
+    const [bulan, setBulan] = useState(getWIBMonthString())
     const [teachers, setTeachers] = useState<Teacher[]>([])
     const [attendance, setAttendance] = useState<TeacherAttendance[]>([])
     const [loading, setLoading] = useState(true)

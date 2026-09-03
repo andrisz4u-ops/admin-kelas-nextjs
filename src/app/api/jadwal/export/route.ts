@@ -5,7 +5,8 @@ import { authOptions } from "@/lib/auth"
 import ExcelJS from "exceljs"
 import path from "path"
 import fs from "fs/promises"
-// import { Buffer } from "buffer" <-- I'll just remove the line I added, or rather replace the block.
+
+export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
     const session = await getServerSession(authOptions)

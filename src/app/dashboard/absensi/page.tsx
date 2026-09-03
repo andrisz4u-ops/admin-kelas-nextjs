@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react"
 import { useSession } from "next-auth/react"
 import toast from "react-hot-toast"
+import { getWIBDateString } from "@/lib/dateUtils"
 
 interface Siswa {
     id: string
@@ -26,7 +27,7 @@ export default function AbsensiPage() {
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
     const [kelas, setKelas] = useState(userKelas || 1)  // Default ke kelas 1 untuk guru_mapel
-    const [tanggal, setTanggal] = useState(new Date().toISOString().split("T")[0])
+    const [tanggal, setTanggal] = useState(getWIBDateString())
 
     // Lock kelas untuk guru biasa saja
     useEffect(() => {

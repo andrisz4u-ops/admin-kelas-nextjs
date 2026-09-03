@@ -39,6 +39,10 @@ export async function PUT(
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
         }
 
+        if (session.user.role !== "admin") {
+            return NextResponse.json({ error: "Hanya admin yang dapat mengedit siswa" }, { status: 403 })
+        }
+
         const { id } = await params
         const body = await request.json()
         const { nis, nama, jenisKelamin, alamat, namaOrtu, noHp } = body
@@ -64,6 +68,10 @@ export async function DELETE(
         const session = await getServerSession(authOptions)
         if (!session) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+        }
+
+        if (session.user.role !== "admin") {
+            return NextResponse.json({ error: "Hanya admin yang dapat menghapus siswa" }, { status: 403 })
         }
 
         const { id } = await params

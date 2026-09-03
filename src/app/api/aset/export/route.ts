@@ -4,6 +4,8 @@ import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import ExcelJS from "exceljs"
 
+export const dynamic = 'force-dynamic'
+
 const KIB_LABELS: Record<string, string> = {
     "A": "KIB A - Tanah",
     "B": "KIB B - Peralatan & Mesin",

@@ -11,22 +11,26 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
         }
 
+        if (session.user.role !== "admin") {
+            return NextResponse.json({ error: "Hanya admin yang dapat mengimpor data siswa" }, { status: 403 })
+        }
+
         const { students, kelas, replace, allClasses } = await request.json()
 
         if (!Array.isArray(students) || students.length === 0) {
             return NextResponse.json({ error: "No data to import" }, { status: 400 })
         }
 
-        // If replace, delete existing students
+        // If replace, delete existing active students only (never delete alumni)
         if (replace) {
             if (allClasses) {
-                // Delete all students from classes 1-6
+                // Delete active students from classes 1-6
                 await prisma.siswa.deleteMany({
-                    where: { kelas: { in: [1, 2, 3, 4, 5, 6] } }
+                    where: { kelas: { in: [1, 2, 3, 4, 5, 6] }, status: "aktif" }
                 })
             } else {
-                // Delete only from selected class
-                await prisma.siswa.deleteMany({ where: { kelas: parseInt(kelas) } })
+                // Delete only active students from selected class
+                await prisma.siswa.deleteMany({ where: { kelas: parseInt(kelas), status: "aktif" } })
             }
         }
 

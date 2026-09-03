@@ -156,7 +156,7 @@ export const SCHOOL_CALENDAR_2026_2027 = {
         { date: "2026-12-23", title: "Pembagian Rapor", type: "semester" },
         { date: "2027-02-17", title: "Pesantren Kilat", type: "event" },
         { date: "2027-02-22", title: "Pesantren Kilat", type: "event" },
-        { date: "2027-02-29", title: "Pesantren Kilat", type: "event" },
+        { date: "2027-02-28", title: "Pesantren Kilat", type: "event" },
         { date: "2027-03-01", title: "Pesantren Kilat", type: "event" },
         { date: "2027-03-04", title: "Simulasi Ujian", type: "exam" },
         { date: "2027-03-22", title: "Ujian Sekolah", type: "exam" },
@@ -172,12 +172,12 @@ export const SCHOOL_CALENDAR_2026_2027 = {
 }
 
 // Helper function: Get all school days in a date range
-export function getSchoolDays(startDate: Date, endDate: Date): Date[] {
+export function getSchoolDays(startDate: Date, endDate: Date, tahunAjaran: string = "2026/2027"): Date[] {
     const days: Date[] = []
     const current = new Date(startDate)
 
     while (current <= endDate) {
-        if (isSchoolDay(current)) {
+        if (isSchoolDay(current, tahunAjaran)) {
             days.push(new Date(current))
         }
         current.setDate(current.getDate() + 1)

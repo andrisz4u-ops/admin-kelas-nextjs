@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
 
         const absensi = await prisma.absensi.findMany({
             where: {
-                siswa: { kelas },
+                siswa: { kelas, status: "aktif" },
                 tanggal: {
                     gte: queryDateStart,
                     lte: queryDateEnd
@@ -59,6 +59,10 @@ export async function POST(request: NextRequest) {
         }
 
         const { entries } = await request.json()
+
+        if (!Array.isArray(entries)) {
+            return NextResponse.json({ error: "Entries harus berupa array" }, { status: 400 })
+        }
 
         for (const entry of entries) {
             // Strict Date Parsing: YYYY-MM-DD -> UTC Midnight

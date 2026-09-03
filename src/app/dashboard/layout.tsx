@@ -119,17 +119,23 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const isGuruMapel = userRole === "guru_mapel"
 
     // Function to check if menu item should be shown
-    const shouldShowMenuItem = (item: MenuItem) => {
+    const shouldShowMenuItem = (item: MenuItem, index?: number): boolean => {
+        // Handle category headers: only show if at least one subsequent item before next header is visible
+        if (item.isHeader) {
+            if (index === undefined) return false
+            const nextItems: MenuItem[] = []
+            for (let i = index + 1; i < menuItems.length; i++) {
+                if (menuItems[i].isHeader) break
+                nextItems.push(menuItems[i])
+            }
+            return nextItems.some(child => shouldShowMenuItem(child))
+        }
+
         // Items with allRoles are visible to everyone
         if (item.allRoles) return true
 
-        // Headers are usually safe to show, but we can refine this if needed
-        // For now, let's show all headers to keep structure
-        if (item.isHeader) return true
-
         // Admin can see everything except kepsekOnly
         if (isAdmin) {
-            // Check existence of property before accessing
             if (item.kepsekOnly) return false
             return true
         }
@@ -141,7 +147,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         if (isKepsek || isPengawas) {
             return ["/dashboard/kepala-sekolah", "/dashboard/kalender"].includes(item.href)
         }
-        // Guru Mapel can see only limited menu: absensi, rekap-absensi, nilai, rekap-nilai, kalender
+        // Guru Mapel can see only limited menu: absensi, rekap-absensi, nilai, rekap-nilai, jadwal, kalender
         if (isGuruMapel) {
             return [
                 "/dashboard",
@@ -149,6 +155,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 "/dashboard/rekap-absensi",
                 "/dashboard/nilai",
                 "/dashboard/rekap-nilai",
+                "/dashboard/jadwal",
                 "/dashboard/kalender"
             ].includes(item.href)
         }
@@ -202,7 +209,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     {/* Navigation - Ini bagian yang akan di scroll */}
                     <nav className="flex-1 overflow-y-auto overflow-x-hidden p-3 pb-20 scrollbar-thin scrollbar-thumb-gray-200">
                         {menuItems.map((item, index) => {
-                            if (!shouldShowMenuItem(item)) return null;
+                            if (!shouldShowMenuItem(item, index)) return null;
 
                             // Render Header Category
                             if (item.isHeader) {

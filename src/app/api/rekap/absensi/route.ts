@@ -4,6 +4,8 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { getSchoolDays, getSemesterRange, getMonthRange, getCalendar } from "@/lib/schoolCalendar"
 
+export const dynamic = 'force-dynamic'
+
 // GET rekap absensi
 export async function GET(request: NextRequest) {
     try {
@@ -40,10 +42,10 @@ export async function GET(request: NextRequest) {
             select: { id: true, nis: true, nama: true },
         })
 
-        // Get all attendance records in the date range
+        // Get all attendance records in the date range for active students
         const absensi = await prisma.absensi.findMany({
             where: {
-                siswa: { kelas },
+                siswa: { kelas, status: "aktif" },
                 tanggal: {
                     gte: startDate,
                     lte: endDate,

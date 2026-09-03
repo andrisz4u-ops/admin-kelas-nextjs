@@ -32,6 +32,9 @@ export default function SiswaPage() {
     const [importData, setImportData] = useState<Siswa[]>([])
     const [importAllClasses, setImportAllClasses] = useState(false)  // Multi-class import mode
     const [showAlumni, setShowAlumni] = useState(false)  // Toggle tampilan alumni
+    const [alumniTahunFilter, setAlumniTahunFilter] = useState("all") // Filter tahun lulus
+    const [searchQuery, setSearchQuery] = useState("") // Search NIS / Nama
+    const [availableTahunLulus, setAvailableTahunLulus] = useState<string[]>([])
 
     // Guru hanya bisa akses kelasnya sendiri
     useEffect(() => {
@@ -43,19 +46,27 @@ export default function SiswaPage() {
     const fetchSiswa = useCallback(async () => {
         try {
             setLoading(true)
-            const statusParam = showAlumni ? "alumni" : "aktif"
             const url = showAlumni
-                ? `/api/siswa?status=${statusParam}`
-                : `/api/siswa?kelas=${kelas}&status=${statusParam}`
+                ? `/api/siswa?status=alumni${alumniTahunFilter !== "all" ? `&tahunLulus=${encodeURIComponent(alumniTahunFilter)}` : ""}`
+                : `/api/siswa?kelas=${kelas}&status=aktif`
             const res = await fetch(url, { cache: "no-store" })
             const data = await res.json()
-            setSiswa(data)
+            const studentList: Siswa[] = Array.isArray(data) ? data : []
+            setSiswa(studentList)
+
+            // Extract unique tahun kelulusan for dropdown if alumni
+            if (showAlumni && alumniTahunFilter === "all") {
+                const years = Array.from(new Set(studentList.map(s => s.tahunLulus).filter(Boolean))) as string[]
+                if (years.length > 0) {
+                    setAvailableTahunLulus(years.sort().reverse())
+                }
+            }
         } catch {
             toast.error("Gagal memuat data siswa")
         } finally {
             setLoading(false)
         }
-    }, [kelas, showAlumni])
+    }, [kelas, showAlumni, alumniTahunFilter])
 
     useEffect(() => {
         fetchSiswa()
@@ -66,14 +77,14 @@ export default function SiswaPage() {
             toast.error("Hanya admin yang bisa menghapus siswa")
             return
         }
-        if (!confirm("Hapus siswa ini?")) return
+        if (!confirm("Hapus data siswa ini?")) return
         try {
             const res = await fetch(`/api/siswa/${id}`, { method: "DELETE" })
             if (!res.ok) {
                 const errorData = await res.json()
                 throw new Error(errorData.error || "Gagal menghapus siswa")
             }
-            toast.success("Siswa berhasil dihapus")
+            toast.success("Data siswa berhasil dihapus")
             fetchSiswa()
         } catch (error: any) {
             toast.error(error.message || "Gagal menghapus siswa")
@@ -81,24 +92,49 @@ export default function SiswaPage() {
     }
 
     const handleExport = () => {
-        if (siswa.length === 0) {
+        const dataToExport = siswa.filter(s => {
+            if (!searchQuery) return true
+            return s.nama.toLowerCase().includes(searchQuery.toLowerCase()) || s.nis.includes(searchQuery)
+        })
+
+        if (dataToExport.length === 0) {
             toast.error("Tidak ada data untuk diexport")
             return
         }
-        const data = siswa.map((s, i) => ({
-            No: i + 1,
-            NIS: s.nis,
-            Nama: s.nama,
-            "L/P": s.jenisKelamin,
-            Alamat: s.alamat || "-",
-            "Nama Ortu": s.namaOrtu || "-",
-            "No HP": s.noHp || "-",
-        }))
-        const ws = XLSX.utils.json_to_sheet(data)
-        const wb = XLSX.utils.book_new()
-        XLSX.utils.book_append_sheet(wb, ws, "Data Siswa")
-        XLSX.writeFile(wb, `Data_Siswa_Kelas${kelas}.xlsx`)
-        toast.success("Data berhasil diexport!")
+
+        if (showAlumni) {
+            const data = dataToExport.map((s, i) => ({
+                No: i + 1,
+                NIS: s.nis,
+                Nama: s.nama,
+                "L/P": s.jenisKelamin,
+                "Tahun Kelulusan": s.tahunLulus || "-",
+                Alamat: s.alamat || "-",
+                "Nama Ortu": s.namaOrtu || "-",
+                "No HP": s.noHp || "-",
+            }))
+            const ws = XLSX.utils.json_to_sheet(data)
+            const wb = XLSX.utils.book_new()
+            XLSX.utils.book_append_sheet(wb, ws, "Data Alumni")
+            const fileSuffix = alumniTahunFilter === "all" ? "Semua_Tahun" : alumniTahunFilter.replace("/", "-")
+            XLSX.writeFile(wb, `Data_Alumni_${fileSuffix}.xlsx`)
+            toast.success("Data alumni berhasil diexport!")
+        } else {
+            const data = dataToExport.map((s, i) => ({
+                No: i + 1,
+                NIS: s.nis,
+                Nama: s.nama,
+                "L/P": s.jenisKelamin,
+                Alamat: s.alamat || "-",
+                "Nama Ortu": s.namaOrtu || "-",
+                "No HP": s.noHp || "-",
+            }))
+            const ws = XLSX.utils.json_to_sheet(data)
+            const wb = XLSX.utils.book_new()
+            XLSX.utils.book_append_sheet(wb, ws, "Data Siswa")
+            XLSX.writeFile(wb, `Data_Siswa_Kelas${kelas}.xlsx`)
+            toast.success("Data siswa aktif berhasil diexport!")
+        }
     }
 
     const downloadTemplate = () => {
@@ -235,75 +271,135 @@ export default function SiswaPage() {
         }
     }
 
+    const displayedSiswa = siswa.filter(s => {
+        if (!searchQuery.trim()) return true
+        const q = searchQuery.toLowerCase()
+        return s.nama.toLowerCase().includes(q) || s.nis.includes(q)
+    })
+
     return (
         <div className="space-y-6">
-            {/* Header */}
+            {/* Top Navigation Tabs: Siswa Aktif vs Alumni */}
+            <div className="flex border-b border-[var(--border)] gap-2">
+                <button
+                    onClick={() => {
+                        setShowAlumni(false)
+                        setSearchQuery("")
+                    }}
+                    className={`pb-3 px-4 text-sm font-semibold border-b-2 transition-all flex items-center gap-2 ${
+                        !showAlumni
+                            ? "border-black text-black"
+                            : "border-transparent text-[var(--accents-5)] hover:text-black"
+                    }`}
+                >
+                    <span>👥 Siswa Aktif</span>
+                    <span className="px-2 py-0.5 rounded-full text-xs bg-gray-100 text-gray-700">Kelas 1 - 6</span>
+                </button>
+                <button
+                    onClick={() => {
+                        setShowAlumni(true)
+                        setSearchQuery("")
+                    }}
+                    className={`pb-3 px-4 text-sm font-semibold border-b-2 transition-all flex items-center gap-2 ${
+                        showAlumni
+                            ? "border-amber-600 text-amber-700"
+                            : "border-transparent text-[var(--accents-5)] hover:text-amber-700"
+                    }`}
+                >
+                    <span>🎓 Data Alumni</span>
+                    <span className="px-2 py-0.5 rounded-full text-xs bg-amber-100 text-amber-800">Lulus</span>
+                </button>
+            </div>
+
+            {/* Header & Action Bar */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-bold tracking-tight text-[var(--foreground)]">
-                        {showAlumni ? "🎓 Data Alumni" : `Data Siswa Kelas ${kelas}`}
+                        {showAlumni ? "🎓 Direktori Alumni SDN 2 Nangerang" : `Data Siswa Kelas ${kelas}`}
                     </h1>
                     <p className="text-sm text-[var(--accents-5)] mt-1">
                         {showAlumni
-                            ? "Daftar siswa yang telah lulus"
-                            : isAdmin ? "Kelola data siswa" : "Lihat data siswa (hanya baca)"}
+                            ? `Arsip siswa yang telah lulus (${displayedSiswa.length} alumni ditampilkan)`
+                            : isAdmin ? `Kelola data siswa aktif (${displayedSiswa.length} siswa)` : `Daftar siswa aktif kelas ${kelas}`}
                     </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                    {/* Toggle alumni */}
-                    <button
-                        onClick={() => setShowAlumni(!showAlumni)}
-                        className={`h-9 px-3 border rounded-md text-sm font-medium transition-colors flex items-center gap-1.5 ${
-                            showAlumni
-                                ? "bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100"
-                                : "bg-white border-[var(--border)] text-[var(--foreground)] hover:bg-[var(--accents-1)]"
-                        }`}
-                    >
-                        🎓 {showAlumni ? "Lihat Siswa Aktif" : "Lihat Alumni"}
-                    </button>
-
-                    {/* Dropdown kelas hanya untuk admin dan bukan mode alumni */}
-                    {isAdmin && !showAlumni ? (
-                        <div className="relative">
-                            <select
-                                value={kelas}
-                                onChange={(e) => setKelas(Number(e.target.value))}
-                                className="h-9 pl-3 pr-8 bg-white border border-[var(--border)] rounded-md text-sm text-[var(--foreground)] outline-none focus:ring-1 focus:ring-black cursor-pointer appearance-none"
-                            >
-                                {[1, 2, 3, 4, 5, 6].map((k) => (
-                                    <option key={k} value={k}>Kelas {k}</option>
-                                ))}
-                            </select>
-                            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[var(--accents-5)]">
-                                <svg width="10" height="6" viewBox="0 0 10 6" fill="none"><path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                            </div>
-                        </div>
-                    ) : (
-                            <span className="h-9 px-3 flex items-center bg-[var(--accents-2)] border border-[var(--border)] rounded-md text-sm font-medium text-[var(--foreground)]">
-                                Kelas {kelas}
-                            </span>
-                        )}
-
-                    {/* Tombol tambah, import hanya untuk admin dan mode aktif */}
-                    {isAdmin && !showAlumni && (
+                    {/* Mode Alumni: Filter Tahun & Search */}
+                    {showAlumni ? (
                         <>
-                            <button onClick={() => { setEditingSiswa(null); setShowModal(true) }} className="h-9 px-3 bg-black text-white rounded-md text-sm font-medium hover:bg-gray-800 transition-colors">
-                                + Tambah
-                            </button>
-                            <button onClick={downloadTemplate} className="h-9 px-3 bg-blue-50 border border-blue-200 text-blue-700 rounded-md text-sm font-medium hover:bg-blue-100 transition-colors flex items-center gap-1.5">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
-                                Template
-                            </button>
-                            <label className="h-9 px-3 bg-white border border-[var(--border)] text-[var(--foreground)] rounded-md text-sm font-medium hover:bg-[var(--accents-1)] transition-colors cursor-pointer flex items-center gap-2">
-                                <span>Import Excel</span>
-                                <input type="file" accept=".xlsx,.xls" onChange={handleFileUpload} className="hidden" />
-                            </label>
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    placeholder="Cari nama / NIS alumni..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="h-9 px-3 bg-white border border-[var(--border)] rounded-md text-sm text-[var(--foreground)] outline-none focus:ring-1 focus:ring-black w-48 sm:w-56"
+                                />
+                            </div>
+
+                            <div className="relative">
+                                <select
+                                    value={alumniTahunFilter}
+                                    onChange={(e) => setAlumniTahunFilter(e.target.value)}
+                                    className="h-9 pl-3 pr-8 bg-white border border-[var(--border)] rounded-md text-sm text-[var(--foreground)] outline-none focus:ring-1 focus:ring-black cursor-pointer appearance-none"
+                                >
+                                    <option value="all">Semua Angkatan</option>
+                                    {availableTahunLulus.map((thn) => (
+                                        <option key={thn} value={thn}>Lulus {thn}</option>
+                                    ))}
+                                </select>
+                                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[var(--accents-5)]">
+                                    <svg width="10" height="6" viewBox="0 0 10 6" fill="none"><path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                                </div>
+                            </div>
+                        </>
+                    ) : (
+                        <>
+                            {/* Mode Siswa Aktif: Dropdown Kelas */}
+                            {isAdmin ? (
+                                <div className="relative">
+                                    <select
+                                        value={kelas}
+                                        onChange={(e) => setKelas(Number(e.target.value))}
+                                        className="h-9 pl-3 pr-8 bg-white border border-[var(--border)] rounded-md text-sm text-[var(--foreground)] outline-none focus:ring-1 focus:ring-black cursor-pointer appearance-none"
+                                    >
+                                        {[1, 2, 3, 4, 5, 6].map((k) => (
+                                            <option key={k} value={k}>Kelas {k}</option>
+                                        ))}
+                                    </select>
+                                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[var(--accents-5)]">
+                                        <svg width="10" height="6" viewBox="0 0 10 6" fill="none"><path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                                    </div>
+                                </div>
+                            ) : (
+                                <span className="h-9 px-3 flex items-center bg-[var(--accents-2)] border border-[var(--border)] rounded-md text-sm font-medium text-[var(--foreground)]">
+                                    Kelas {kelas}
+                                </span>
+                            )}
+
+                            {/* Tombol tambah, import hanya untuk admin di mode aktif */}
+                            {isAdmin && (
+                                <>
+                                    <button onClick={() => { setEditingSiswa(null); setShowModal(true) }} className="h-9 px-3 bg-black text-white rounded-md text-sm font-medium hover:bg-gray-800 transition-colors">
+                                        + Tambah
+                                    </button>
+                                    <button onClick={downloadTemplate} className="h-9 px-3 bg-blue-50 border border-blue-200 text-blue-700 rounded-md text-sm font-medium hover:bg-blue-100 transition-colors flex items-center gap-1.5">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
+                                        Template
+                                    </button>
+                                    <label className="h-9 px-3 bg-white border border-[var(--border)] text-[var(--foreground)] rounded-md text-sm font-medium hover:bg-[var(--accents-1)] transition-colors cursor-pointer flex items-center gap-2">
+                                        <span>Import Excel</span>
+                                        <input type="file" accept=".xlsx,.xls" onChange={handleFileUpload} className="hidden" />
+                                    </label>
+                                </>
+                            )}
                         </>
                     )}
 
-                    {/* Export bisa untuk semua */}
-                    <button onClick={handleExport} className="h-9 px-3 bg-white border border-[var(--border)] text-[var(--foreground)] rounded-md text-sm font-medium hover:bg-[var(--accents-1)] transition-colors">
-                        Export
+                    {/* Export button */}
+                    <button onClick={handleExport} className="h-9 px-3 bg-white border border-[var(--border)] text-[var(--foreground)] rounded-md text-sm font-medium hover:bg-[var(--accents-1)] transition-colors flex items-center gap-1.5">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
+                        Export Excel
                     </button>
                 </div>
             </div>
@@ -315,12 +411,11 @@ export default function SiswaPage() {
                         <thead>
                             <tr className="border-b border-[var(--border)] bg-[var(--accents-1)]">
                                 <th className="px-4 py-3 font-medium text-[var(--accents-5)] w-12">No</th>
-                                {showAlumni && <th className="px-4 py-3 font-medium text-[var(--accents-5)] w-16">Kelas</th>}
-                                <th className="px-4 py-3 font-medium text-[var(--accents-5)] w-24">NIS</th>
+                                <th className="px-4 py-3 font-medium text-[var(--accents-5)] w-28">NIS</th>
                                 <th className="px-4 py-3 font-medium text-[var(--accents-5)]">Nama Siswa</th>
                                 <th className="px-4 py-3 font-medium text-[var(--accents-5)] w-16">L/P</th>
                                 {showAlumni ? (
-                                    <th className="px-4 py-3 font-medium text-[var(--accents-5)]">Tahun Lulus</th>
+                                    <th className="px-4 py-3 font-medium text-[var(--accents-5)]">Tahun Kelulusan</th>
                                 ) : (
                                     <>
                                         <th className="px-4 py-3 font-medium text-[var(--accents-5)]">Alamat</th>
@@ -328,28 +423,27 @@ export default function SiswaPage() {
                                         <th className="px-4 py-3 font-medium text-[var(--accents-5)]">No. HP</th>
                                     </>
                                 )}
-                                {isAdmin && !showAlumni && <th className="px-4 py-3 font-medium text-[var(--accents-5)] text-right">Aksi</th>}
+                                {isAdmin && <th className="px-4 py-3 font-medium text-[var(--accents-5)] text-right">Aksi</th>}
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-[var(--border)]">
                             {loading ? (
-                                <tr><td colSpan={isAdmin && !showAlumni ? 8 : 6} className="px-4 py-12 text-center text-[var(--accents-5)]">Memuat data...</td></tr>
-                            ) : siswa.length === 0 ? (
-                                <tr><td colSpan={isAdmin && !showAlumni ? 8 : 6} className="px-4 py-12 text-center text-[var(--accents-5)]">
-                                    {showAlumni ? "Belum ada data alumni" : "Belum ada data siswa"}
+                                <tr><td colSpan={isAdmin ? 8 : 6} className="px-4 py-12 text-center text-[var(--accents-5)]">Memuat data...</td></tr>
+                            ) : displayedSiswa.length === 0 ? (
+                                <tr><td colSpan={isAdmin ? 8 : 6} className="px-4 py-12 text-center text-[var(--accents-5)]">
+                                    {showAlumni ? "Belum ada data alumni untuk angkatan ini" : "Belum ada data siswa di kelas ini"}
                                 </td></tr>
                             ) : (
-                                siswa.map((s, i) => (
+                                displayedSiswa.map((s, i) => (
                                     <tr key={s.id} className="hover:bg-[var(--accents-1)] transition-colors group">
                                         <td className="px-4 py-3 text-[var(--accents-5)]">{i + 1}</td>
-                                        {showAlumni && <td className="px-4 py-3 font-semibold text-amber-600">{s.kelas}</td>}
                                         <td className="px-4 py-3 text-[var(--foreground)] font-medium tabular-nums">{s.nis}</td>
                                         <td className="px-4 py-3 text-[var(--foreground)] font-medium">{s.nama}</td>
                                         <td className="px-4 py-3 text-[var(--accents-6)]">{s.jenisKelamin}</td>
                                         {showAlumni ? (
                                             <td className="px-4 py-3">
-                                                <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded text-xs font-medium">
-                                                    Lulus {s.tahunLulus || "-"}
+                                                <span className="px-2.5 py-1 bg-amber-100 text-amber-800 rounded-full text-xs font-semibold">
+                                                    🎓 Angkatan {s.tahunLulus || "-"}
                                                 </span>
                                             </td>
                                         ) : (
@@ -359,10 +453,12 @@ export default function SiswaPage() {
                                                 <td className="px-4 py-3 text-[var(--accents-5)] font-medium tabular-nums">{s.noHp || "-"}</td>
                                             </>
                                         )}
-                                        {isAdmin && !showAlumni && (
+                                        {isAdmin && (
                                             <td className="px-4 py-3 text-right">
                                                 <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <button onClick={() => { setEditingSiswa(s); setShowModal(true) }} className="text-[var(--accents-5)] hover:text-black">Edit</button>
+                                                    {!showAlumni && (
+                                                        <button onClick={() => { setEditingSiswa(s); setShowModal(true) }} className="text-[var(--accents-5)] hover:text-black">Edit</button>
+                                                    )}
                                                     <button onClick={() => handleDelete(s.id)} className="text-red-500 hover:text-red-700">Hapus</button>
                                                 </div>
                                             </td>

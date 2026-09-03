@@ -49,13 +49,8 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
         }
 
-        // Only admin can do this
-        const user = await prisma.user.findUnique({
-            where: { username: session.user?.name || "" },
-        })
         // Check role via session metadata
-        const sessionWithRole = session as any
-        if (sessionWithRole?.user?.role !== "admin") {
+        if (session.user.role !== "admin") {
             return NextResponse.json({ error: "Hanya admin yang dapat memproses kenaikan kelas" }, { status: 403 })
         }
 
@@ -84,11 +79,12 @@ export async function POST(request: NextRequest) {
                 perKelasBefore[c.kelas] = c._count.id
             }
 
-            // 2. Archive class 6 students as alumni
+            // 2. Archive class 6 students as alumni and set kelas to 0
             const alumni = await tx.siswa.updateMany({
                 where: { kelas: 6, status: "aktif" },
                 data: {
                     status: "alumni",
+                    kelas: 0,
                     tahunLulus: tahunAjaranSekarang,
                 },
             })
@@ -128,12 +124,12 @@ export async function POST(request: NextRequest) {
             })
 
             // 5. Log activity
-            if (user) {
+            if (session.user?.id) {
                 await tx.activityLog.create({
                     data: {
-                        userId: user.id,
+                        userId: session.user.id,
                         action: "KENAIKAN_KELAS",
-                        details: `Proses kenaikan kelas tahun ajaran ${tahunAjaranSekarang} → ${tahunAjaranBaru}. ${alumni.count} siswa kelas 6 diarsipkan sebagai alumni.`,
+                        details: `Proses kenaikan kelas tahun ajaran ${tahunAjaranSekarang} → ${tahunAjaranBaru}. ${alumni.count} siswa kelas 6 diarsipkan sebagai alumni (kelas diset ke 0).`,
                         metadata: JSON.stringify({ perKelasBefore, tahunAjaranSekarang, tahunAjaranBaru }),
                     },
                 })
