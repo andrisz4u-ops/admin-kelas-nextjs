@@ -52,7 +52,7 @@ const menuItems: MenuItem[] = [
     { href: "/dashboard/manajemen-akun", icon: "users-cog", label: "Manajemen Akun", adminOnly: true },
     { href: "/dashboard/activity-log", icon: "activity", label: "Log Aktivitas", adminOnly: true },
     { href: "/dashboard/kepala-sekolah", icon: "school", label: "Monitoring Sekolah", kepsekOnly: true },
-    { href: "/dashboard/pengaturan", icon: "cog", label: "Pengaturan", adminOnly: true },
+    { href: "/dashboard/pengaturan", icon: "cog", label: "Pengaturan", allRoles: true },
 ]
 
 function Icon({ name, className, strokeWidth = 2 }: { name: string; className?: string; strokeWidth?: number }) {
@@ -117,6 +117,37 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const isPengawas = userRole === "pengawas"
     const isGuru = userRole === "guru"
     const isGuruMapel = userRole === "guru_mapel"
+
+    const mobileNavItems = [
+        {
+            label: "Dashboard",
+            href: "/dashboard",
+            icon: "home",
+            isActive: pathname === "/dashboard",
+            isUserAvatar: false
+        },
+        {
+            label: "Daftar Hadir",
+            href: isAdmin ? "/dashboard/absensi-guru" : (isKepsek || isPengawas ? "/dashboard/kepala-sekolah" : "/dashboard/absensi"),
+            icon: "clipboard-check",
+            isActive: pathname.startsWith("/dashboard/absensi") || pathname === "/dashboard/absensi-guru" || pathname.startsWith("/dashboard/rekap-absensi"),
+            isUserAvatar: false
+        },
+        {
+            label: (isKepsek || isPengawas) ? "Kalender" : "Daftar Nilai",
+            href: (isKepsek || isPengawas) ? "/dashboard/kalender" : "/dashboard/nilai",
+            icon: (isKepsek || isPengawas) ? "calendar" : "chart-line",
+            isActive: pathname.startsWith("/dashboard/nilai") || pathname.startsWith("/dashboard/rekap-nilai") || pathname.startsWith("/dashboard/analitik-nilai") || ((isKepsek || isPengawas) && pathname === "/dashboard/kalender"),
+            isUserAvatar: false
+        },
+        {
+            label: "Akun",
+            href: "/dashboard/pengaturan",
+            icon: "cog",
+            isActive: pathname === "/dashboard/pengaturan",
+            isUserAvatar: true
+        }
+    ]
 
     // Function to check if menu item should be shown
     const shouldShowMenuItem = (item: MenuItem, index?: number): boolean => {
@@ -234,7 +265,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                                         }`}
                                 >
                                     <Icon name={item.icon || "menu"} className={`w-[18px] h-[18px] ${isActive ? 'text-slate-700' : 'text-slate-400'}`} strokeWidth={2} />
-                                    <span>{item.label}</span>
+                                    <span>{item.href === "/dashboard/pengaturan" && !isAdmin ? "Pengaturan Akun" : item.label}</span>
                                 </Link>
                             )
                         })}
@@ -294,11 +325,56 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </div>
 
             {/* Main content */}
-            <main className={`flex-1 flex flex-col min-w-0 transition-all duration-300 lg:ml-64 bg-[#f3f4f6] min-h-screen pt-16 lg:pt-0`}>
+            <main className={`flex-1 flex flex-col min-w-0 transition-all duration-300 lg:ml-64 bg-[#f3f4f6] min-h-screen pt-16 lg:pt-0 pb-20 lg:pb-0`}>
                 <div className="flex-1 p-4 md:p-6 lg:p-8 w-full max-w-[1400px] mx-auto overflow-x-hidden">
                     {children}
                 </div>
             </main>
+
+            {/* Mobile Bottom Navigation Bar (Android / HP) */}
+            <nav
+                aria-label="Navigasi Bawah Mobile"
+                className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-lg border-t border-slate-200/90 shadow-[0_-4px_25px_rgba(0,0,0,0.06)] px-2 pt-1.5 pb-[calc(env(safe-area-inset-bottom,0px)+8px)]"
+            >
+                <div className="grid grid-cols-4 items-center max-w-lg mx-auto">
+                    {mobileNavItems.map((item, idx) => {
+                        const active = item.isActive
+                        return (
+                            <Link
+                                key={idx}
+                                href={item.href}
+                                className={`flex flex-col items-center justify-center py-1 px-1 rounded-xl transition-all duration-200 ${
+                                    active
+                                        ? "text-indigo-600 font-bold"
+                                        : "text-slate-500 hover:text-slate-900 active:scale-95"
+                                }`}
+                            >
+                                <div className={`relative p-1.5 rounded-xl transition-all ${active ? "bg-indigo-50" : ""}`}>
+                                    {item.isUserAvatar && session.user.fotoProfilUrl ? (
+                                        <img
+                                            src={session.user.fotoProfilUrl}
+                                            alt="Profil"
+                                            className={`w-5 h-5 rounded-full object-cover border ${active ? "border-indigo-600 ring-2 ring-indigo-200" : "border-slate-300"}`}
+                                        />
+                                    ) : (
+                                        <Icon
+                                            name={item.icon}
+                                            className={`w-5 h-5 ${active ? "text-indigo-600" : "text-slate-500"}`}
+                                            strokeWidth={active ? 2.2 : 1.8}
+                                        />
+                                    )}
+                                    {active && (
+                                        <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-indigo-600 rounded-full ring-2 ring-white" />
+                                    )}
+                                </div>
+                                <span className={`text-[10px] tracking-tight mt-0.5 truncate max-w-[76px] ${active ? "font-bold text-indigo-600" : "font-medium text-slate-500"}`}>
+                                    {item.label}
+                                </span>
+                            </Link>
+                        )
+                    })}
+                </div>
+            </nav>
         </div>
     )
 }

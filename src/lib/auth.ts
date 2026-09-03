@@ -62,7 +62,7 @@ export const authOptions: NextAuthOptions = {
         })
     ],
     callbacks: {
-        async jwt({ token, user }) {
+        async jwt({ token, user, trigger, session }) {
             if (user) {
                 token.id = user.id
                 token.username = user.username
@@ -70,6 +70,10 @@ export const authOptions: NextAuthOptions = {
                 token.kelas = user.kelas
                 token.fotoProfilUrl = user.fotoProfilUrl
                 token.mapelDiampu = user.mapelDiampu
+            }
+            if (trigger === "update" && session) {
+                if (session.name) token.name = session.name
+                if (session.fotoProfilUrl !== undefined) token.fotoProfilUrl = session.fotoProfilUrl
             }
             return token
         },

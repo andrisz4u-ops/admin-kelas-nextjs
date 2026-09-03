@@ -4,6 +4,8 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import bcrypt from "bcryptjs"
 
+export const dynamic = 'force-dynamic'
+
 // GET current user's account info
 export async function GET() {
     try {
@@ -20,6 +22,8 @@ export async function GET() {
                 username: true,
                 role: true,
                 nip: true,
+                kelas: true,
+                mapelDiampu: true,
                 fotoProfilUrl: true
             }
         })
@@ -70,6 +74,10 @@ export async function POST(request: NextRequest) {
 
         // Update password if provided
         if (newPassword && newPassword.trim() !== "") {
+            if (newPassword.length < 6) {
+                return NextResponse.json({ error: "Password baru minimal harus 6 karakter" }, { status: 400 })
+            }
+
             // Verify current password first
             if (!currentPassword) {
                 return NextResponse.json({ error: "Password lama diperlukan untuk mengubah password" }, { status: 400 })
@@ -93,7 +101,7 @@ export async function POST(request: NextRequest) {
             updateData.password = await bcrypt.hash(newPassword, 10)
         }
 
-        // Update profile photo if provided
+        // Update profile photo if provided (allow string URL or null to remove photo)
         if (fotoProfilUrl !== undefined) {
             updateData.fotoProfilUrl = fotoProfilUrl
         }
@@ -103,12 +111,22 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: "Tidak ada data yang diubah" }, { status: 400 })
         }
 
-        await prisma.user.update({
+        const updatedUser = await prisma.user.update({
             where: { id: session.user.id },
-            data: updateData
+            data: updateData,
+            select: {
+                id: true,
+                name: true,
+                username: true,
+                role: true,
+                nip: true,
+                kelas: true,
+                mapelDiampu: true,
+                fotoProfilUrl: true
+            }
         })
 
-        return NextResponse.json({ success: true, message: "Akun berhasil diperbarui" })
+        return NextResponse.json({ success: true, message: "Akun berhasil diperbarui", user: updatedUser })
     } catch (error) {
         console.error("Error updating my account:", error)
         return NextResponse.json({ error: "Internal server error" }, { status: 500 })
