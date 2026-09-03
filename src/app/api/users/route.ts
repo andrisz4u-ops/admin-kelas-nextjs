@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 
+export const dynamic = 'force-dynamic'
+
 // GET users by role
 export async function GET(request: NextRequest) {
     try {
