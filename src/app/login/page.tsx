@@ -53,11 +53,15 @@ export default function LoginPage() {
             <div className="w-full max-w-md">
                 {/* Logo & Header */}
                 <div className="text-center mb-8">
-                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-black text-white text-2xl font-bold mb-4 shadow-lg">
-                        🏫
+                    <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-white p-2.5 mb-4 shadow-md border border-gray-100">
+                        <img
+                            src="/logo-sekolah.png"
+                            alt="Logo SDN 2 Nangerang"
+                            className="w-full h-full object-contain"
+                        />
                     </div>
-                    <h1 className="text-2xl font-bold text-gray-900">Sistem Informasi Kelas</h1>
-                    <p className="text-sm text-gray-500 mt-1">Masuk untuk mengelola data kelas</p>
+                    <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Sistem Informasi Kelas</h1>
+                    <p className="text-sm text-gray-500 mt-1">SDN 2 Nangerang &bull; Masuk untuk mengelola data</p>
                 </div>
 
                 {/* Form Card */}
