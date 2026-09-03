@@ -68,12 +68,20 @@ export const authOptions: NextAuthOptions = {
                 token.username = user.username
                 token.role = user.role
                 token.kelas = user.kelas
-                token.fotoProfilUrl = user.fotoProfilUrl
+                token.fotoProfilUrl = user.fotoProfilUrl?.startsWith("data:")
+                    ? `/api/avatar?userId=${user.id}`
+                    : user.fotoProfilUrl
                 token.mapelDiampu = user.mapelDiampu
             }
             if (trigger === "update" && session) {
                 if (session.name) token.name = session.name
-                if (session.fotoProfilUrl !== undefined) token.fotoProfilUrl = session.fotoProfilUrl
+                if (session.fotoProfilUrl !== undefined) {
+                    if (session.fotoProfilUrl && session.fotoProfilUrl.startsWith("data:")) {
+                        token.fotoProfilUrl = `/api/avatar?userId=${token.id}&t=${Date.now()}`
+                    } else {
+                        token.fotoProfilUrl = session.fotoProfilUrl
+                    }
+                }
             }
             return token
         },

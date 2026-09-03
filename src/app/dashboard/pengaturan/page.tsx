@@ -113,52 +113,84 @@ export default function PengaturanPage() {
         if (session) fetchSettings()
     }, [session, isAdmin])
 
+function compressImage(file: File, maxWidth = 400, maxHeight = 400, quality = 0.8): Promise<string> {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = (e) => {
+            const img = new Image()
+            img.onload = () => {
+                let width = img.width
+                let height = img.height
+
+                if (width > height) {
+                    if (width > maxWidth) {
+                        height = Math.round((height * maxWidth) / width)
+                        width = maxWidth
+                    }
+                } else {
+                    if (height > maxHeight) {
+                        width = Math.round((width * maxHeight) / height)
+                        height = maxHeight
+                    }
+                }
+
+                const canvas = document.createElement("canvas")
+                canvas.width = width
+                canvas.height = height
+                const ctx = canvas.getContext("2d")
+                if (!ctx) {
+                    resolve(e.target?.result as string)
+                    return
+                }
+
+                ctx.drawImage(img, 0, 0, width, height)
+                const dataUrl = canvas.toDataURL("image/jpeg", quality)
+                resolve(dataUrl)
+            }
+            img.onerror = () => reject(new Error("Gagal membaca berkas gambar"))
+            img.src = e.target?.result as string
+        }
+        reader.onerror = () => reject(new Error("Gagal memproses berkas"))
+        reader.readAsDataURL(file)
+    })
+}
+
     const handleFotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
         if (!file) return
 
-        if (file.size > 2 * 1024 * 1024) {
-            toast.error("Ukuran foto maksimal 2MB")
+        if (file.size > 5 * 1024 * 1024) {
+            toast.error("Ukuran foto maksimal 5MB")
             return
         }
 
-        if (!["image/jpeg", "image/png", "image/webp", "image/jpg"].includes(file.type.toLowerCase())) {
-            toast.error("Format foto harus JPG, PNG, atau WEBP")
+        if (!file.type.startsWith("image/")) {
+            toast.error("Format berkas harus berupa gambar (JPG, PNG, atau WEBP)")
             return
         }
 
         try {
             setUploadingFoto(true)
-            const formData = new FormData()
-            formData.append("file", file)
+            // Kompres gambar di sisi klien menjadi resolusi avatar optimal (~30-50 KB)
+            const compressedDataUrl = await compressImage(file, 400, 400, 0.8)
 
-            const uploadRes = await fetch("/api/upload", {
-                method: "POST",
-                body: formData,
-            })
-
-            const uploadData = await uploadRes.json()
-            if (!uploadRes.ok) {
-                throw new Error(uploadData.error || "Gagal mengunggah foto")
-            }
-
-            const newFotoUrl = uploadData.url
-
-            // Update to account API
+            // Simpan langsung ke database melalui endpoint akun
             const saveRes = await fetch("/api/settings/my-account", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ fotoProfilUrl: newFotoUrl }),
+                body: JSON.stringify({ fotoProfilUrl: compressedDataUrl }),
             })
 
+            const saveData = await saveRes.json()
             if (!saveRes.ok) {
-                throw new Error("Gagal menyimpan URL foto profil")
+                throw new Error(saveData.error || "Gagal menyimpan foto profil")
             }
 
-            setMyAccount(prev => ({ ...prev, fotoProfilUrl: newFotoUrl }))
-            await update({ fotoProfilUrl: newFotoUrl })
+            setMyAccount(prev => ({ ...prev, fotoProfilUrl: compressedDataUrl }))
+            await update({ fotoProfilUrl: compressedDataUrl })
             toast.success("Foto profil berhasil diperbarui!")
         } catch (error: any) {
+            console.error("Upload error:", error)
             toast.error(error.message || "Gagal mengunggah foto profil")
         } finally {
             setUploadingFoto(false)
