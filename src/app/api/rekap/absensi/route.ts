@@ -62,6 +62,19 @@ export async function GET(request: NextRequest) {
         const schoolDays = getSchoolDays(startDate, endDate)
         const totalSchoolDays = schoolDays.length
 
+        // Get all unique dates attendance was actually recorded for this class in the period
+        const recordedDates = new Set(absensi.map((a) => {
+            const d = a.tanggal
+            const y = d.getUTCFullYear()
+            const m = String(d.getUTCMonth() + 1).padStart(2, '0')
+            const day = String(d.getUTCDate()).padStart(2, '0')
+            return `${y}-${m}-${day}`
+        }))
+        const totalRecordedDays = recordedDates.size
+
+        // Effective school days: at least calendar days, or follows actual conducted meeting days
+        const effectiveSchoolDays = Math.max(totalSchoolDays, totalRecordedDays)
+
         // Build recap data
         const recap = students.map((student) => {
             const studentAbsensi = absensi.filter((a) => a.siswaId === student.id)
@@ -82,8 +95,11 @@ export async function GET(request: NextRequest) {
             })
 
             const totalRecorded = counts.H + counts.S + counts.I + counts.A
-            const percentage = totalSchoolDays > 0
-                ? Math.round((counts.H / totalSchoolDays) * 100)
+
+            // Divisor ensures percentage represents valid attendance rate and never exceeds 100%
+            const divisor = Math.max(effectiveSchoolDays, totalRecorded, counts.H)
+            const percentage = divisor > 0
+                ? Math.min(100, Math.round((counts.H / divisor) * 100))
                 : 0
 
             return {
@@ -95,7 +111,7 @@ export async function GET(request: NextRequest) {
                 izin: counts.I,
                 alpha: counts.A,
                 totalRecorded,
-                totalSchoolDays,
+                totalSchoolDays: effectiveSchoolDays,
                 percentage,
                 dailyLogs,
             }
@@ -126,7 +142,7 @@ export async function GET(request: NextRequest) {
             meta: {
                 startDate: startDate.toISOString(),
                 endDate: endDate.toISOString(),
-                totalSchoolDays,
+                totalSchoolDays: effectiveSchoolDays,
                 holidaysInPeriod,
                 type,
                 month: type === "month" ? month : undefined,
