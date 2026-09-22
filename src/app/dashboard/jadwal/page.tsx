@@ -34,14 +34,25 @@ export default function JadwalPage() {
     const { data: session } = useSession()
     const isAdmin = session?.user?.role === "admin"
     const isGuruMapel = session?.user?.role === "guru_mapel"
+    const isPengawas = session?.user?.role === "pengawas"
+    const isKepsek = session?.user?.role === "kepsek"
     const isGuru = session?.user?.role === "guru" || isGuruMapel
-    const canSelectKelas = isAdmin || isGuruMapel
+    const canSelectKelas = isAdmin || isGuruMapel || isPengawas || isKepsek
+    const isReadOnly = isPengawas || isKepsek
     const userKelas = session?.user?.kelas
 
     const [kelas, setKelas] = useState<number>(userKelas || 1)
 
-    // Lock kelas untuk wali kelas biasa, izinkan admin dan guru_mapel pilih kelas
+    // Lock kelas untuk wali kelas biasa, izinkan admin, pengawas, kepsek, guru_mapel pilih kelas
     useEffect(() => {
+        if (typeof window !== "undefined") {
+            const params = new URLSearchParams(window.location.search)
+            const qKelas = params.get("kelas")
+            if (qKelas && [1, 2, 3, 4, 5, 6].includes(Number(qKelas))) {
+                setKelas(Number(qKelas))
+                return
+            }
+        }
         if (!canSelectKelas && userKelas) {
             setKelas(userKelas)
         } else if (!kelas) {
@@ -96,7 +107,7 @@ export default function JadwalPage() {
     }
 
     const handleCellClick = (day: string, jam: number) => {
-        if (!isAdmin && !isGuru) return // View only for others?
+        if (isReadOnly || (!isAdmin && !isGuru)) return // View only for supervisor/kepsek
 
         const existing = getScheduleItem(day, jam)
         if (existing) {
@@ -109,7 +120,7 @@ export default function JadwalPage() {
                 kelas,
                 hari: day,
                 jamKe: jam,
-                waktu: existingTime || "", // Default empty
+                waktu: existingTime,
                 mapel: "",
                 guru: ""
             })
@@ -119,13 +130,18 @@ export default function JadwalPage() {
 
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault()
-        if (!editingItem) return
+        if (isReadOnly || !editingItem || !editingItem.mapel) return
 
         try {
+            const payload = {
+                ...editingItem,
+                kelas // Ensure current class is used
+            }
+
             const res = await fetch("/api/jadwal", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ ...editingItem, kelas }) // Ensure kelas is set
+                body: JSON.stringify(payload)
             })
 
             if (res.ok) {
@@ -141,7 +157,7 @@ export default function JadwalPage() {
     }
 
     const handleDelete = async () => {
-        if (!itemToDelete) return
+        if (isReadOnly || !itemToDelete) return
         try {
             const res = await fetch(`/api/jadwal?id=${itemToDelete}`, { method: "DELETE" })
             if (res.ok) {
@@ -160,6 +176,7 @@ export default function JadwalPage() {
 
     // Additional Delete trigger from Edit Modal
     const promptDelete = (id: string) => {
+        if (isReadOnly) return
         setItemToDelete(id)
         setIsDeleteModalOpen(true)
     }
@@ -194,8 +211,17 @@ export default function JadwalPage() {
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold tracking-tight text-[var(--foreground)]">Jadwal Pelajaran</h1>
-                    <p className="text-sm text-[var(--accents-5)] mt-1">Atur jadwal mata pelajaran mingguan (Senin - Jumat)</p>
+                    <div className="flex items-center gap-2">
+                        <h1 className="text-2xl font-bold tracking-tight text-[var(--foreground)]">Jadwal Pelajaran Kelas {kelas}</h1>
+                        {isReadOnly && (
+                            <span className="px-2.5 py-0.5 rounded text-xs bg-purple-100 text-purple-700 font-semibold border border-purple-200">
+                                Mode Supervisi (Hanya Lihat)
+                            </span>
+                        )}
+                    </div>
+                    <p className="text-sm text-[var(--accents-5)] mt-1">
+                        {isReadOnly ? "Pemantauan jadwal mata pelajaran mingguan (Senin - Jumat)" : "Atur jadwal mata pelajaran mingguan (Senin - Jumat)"}
+                    </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                     {canSelectKelas ? (

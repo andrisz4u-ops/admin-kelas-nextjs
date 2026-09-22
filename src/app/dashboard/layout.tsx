@@ -174,9 +174,23 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         // Ensure item.href is present for path checks below
         if (!item.href) return false;
 
-        // Kepsek and Pengawas can see ONLY Monitoring Sekolah and Kalender Akademik
+        // Kepsek and Pengawas can see Academic, Reports, Monitoring, and Facilities
         if (isKepsek || isPengawas) {
-            return ["/dashboard/kepala-sekolah", "/dashboard/kalender"].includes(item.href)
+            return [
+                "/dashboard/kepala-sekolah",
+                "/dashboard/siswa",
+                "/dashboard/absensi",
+                "/dashboard/nilai",
+                "/dashboard/jurnal",
+                "/dashboard/jadwal",
+                "/dashboard/kalender",
+                "/dashboard/rekap-absensi",
+                "/dashboard/rekap-nilai",
+                "/dashboard/analitik-nilai",
+                "/dashboard/perpustakaan",
+                "/dashboard/aset",
+                "/dashboard/pengaturan"
+            ].includes(item.href)
         }
         // Guru Mapel can see only limited menu: absensi, rekap-absensi, nilai, rekap-nilai, jadwal, kalender
         if (isGuruMapel) {
@@ -265,7 +279,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                                         }`}
                                 >
                                     <Icon name={item.icon || "menu"} className={`w-[18px] h-[18px] ${isActive ? 'text-slate-700' : 'text-slate-400'}`} strokeWidth={2} />
-                                    <span>{item.href === "/dashboard/pengaturan" && !isAdmin ? "Pengaturan Akun" : item.label}</span>
+                                    <span>
+                                        {item.href === "/dashboard/pengaturan" && !isAdmin
+                                            ? "Pengaturan Akun"
+                                            : item.href === "/dashboard/kepala-sekolah" && isPengawas
+                                                ? "Monitoring Supervisi"
+                                                : item.label}
+                                    </span>
                                 </Link>
                             )
                         })}

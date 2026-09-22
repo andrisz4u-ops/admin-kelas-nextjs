@@ -35,21 +35,41 @@ const KKM = 70
 export default function RekapNilaiPage() {
     const { data: session } = useSession()
     const isAdmin = session?.user?.role === "admin"
+    const isPengawas = session?.user?.role === "pengawas"
+    const isKepsek = session?.user?.role === "kepsek"
+    const canSelectKelas = isAdmin || isPengawas || isKepsek
     const userKelas = session?.user?.kelas
 
     const [recap, setRecap] = useState<RekapSiswa[]>([])
     const [meta, setMeta] = useState<RekapMeta | null>(null)
     const [loading, setLoading] = useState(false)
-    const [kelas, setKelas] = useState(userKelas || 5)
-    const [semester, setSemester] = useState(2)
+    const [kelas, setKelas] = useState(userKelas || 1)
+    const [semester, setSemester] = useState(1)
     const [selectedMapel, setSelectedMapel] = useState("")
     const [viewMode, setViewMode] = useState<"summary" | "detail">("summary")
 
     useEffect(() => {
-        if (!isAdmin && userKelas) {
+        if (typeof window !== "undefined") {
+            const params = new URLSearchParams(window.location.search)
+            const qKelas = params.get("kelas")
+            if (qKelas && [1, 2, 3, 4, 5, 6].includes(Number(qKelas))) {
+                setKelas(Number(qKelas))
+            }
+        }
+        if (!canSelectKelas && userKelas) {
             setKelas(userKelas)
         }
-    }, [isAdmin, userKelas])
+
+        // Ambil semester aktif dari pengaturan sekolah
+        fetch("/api/settings/school")
+            .then(res => res.ok ? res.json() : null)
+            .then(data => {
+                if (data?.semesterAktif) {
+                    setSemester(Number(data.semesterAktif))
+                }
+            })
+            .catch(() => {})
+    }, [canSelectKelas, userKelas])
 
     const fetchData = useCallback(async () => {
         try {
@@ -141,7 +161,7 @@ export default function RekapNilaiPage() {
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                     {/* Class selector */}
-                    {isAdmin ? (
+                    {canSelectKelas ? (
                         <div className="relative">
                             <select
                                 value={kelas}

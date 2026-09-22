@@ -22,6 +22,10 @@ export default function NilaiPage() {
     const { data: session } = useSession()
     const isAdmin = session?.user?.role === "admin"
     const isGuruMapel = session?.user?.role === "guru_mapel"
+    const isPengawas = session?.user?.role === "pengawas"
+    const isKepsek = session?.user?.role === "kepsek"
+    const canSelectKelas = isAdmin || isGuruMapel || isPengawas || isKepsek
+    const isReadOnly = isPengawas || isKepsek
     const userKelas = session?.user?.kelas
     const userMapelDiampu = session?.user?.mapelDiampu
 
@@ -29,7 +33,8 @@ export default function NilaiPage() {
     const [nilai, setNilai] = useState<NilaiData>({})
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
-    const [kelas, setKelas] = useState(userKelas || 5)
+    const [kelas, setKelas] = useState(userKelas || 1)
+    const [semester, setSemester] = useState(1)
     const [mapel, setMapel] = useState("")
     const [jenisNilai, setJenisNilai] = useState("")
 
@@ -39,21 +44,36 @@ export default function NilaiPage() {
         if (isGuruMapel && userMapelDiampu) {
             return getMapelForGuruMapel(userMapelDiampu)
         }
-        // Admin: all subjects
-        if (isAdmin) {
+        // Admin, Pengawas, Kepsek: all subjects
+        if (isAdmin || isPengawas || isKepsek) {
             return getMapelByKelas(kelas)
         }
         // Regular guru: all except exclusive subjects (AKPK, PAI)
         return getMapelByKelas(kelas).filter(m => !isExclusiveMapel(m))
-    }, [kelas, isAdmin, isGuruMapel, userMapelDiampu])
+    }, [kelas, isAdmin, isPengawas, isKepsek, isGuruMapel, userMapelDiampu])
 
-    const canSelectKelas = isAdmin || isGuruMapel  // Admin dan guru_mapel bisa pilih kelas
-
-    // Lock kelas untuk guru biasa saja
+    // Cek query param ?kelas= dan lock kelas untuk guru biasa saja, serta load semester aktif
     useEffect(() => {
+        if (typeof window !== "undefined") {
+            const params = new URLSearchParams(window.location.search)
+            const qKelas = params.get("kelas")
+            if (qKelas && [1, 2, 3, 4, 5, 6].includes(Number(qKelas))) {
+                setKelas(Number(qKelas))
+            }
+        }
         if (!canSelectKelas && userKelas) {
             setKelas(userKelas)
         }
+
+        // Ambil semester aktif dari pengaturan sekolah
+        fetch("/api/settings/school")
+            .then(res => res.ok ? res.json() : null)
+            .then(data => {
+                if (data?.semesterAktif) {
+                    setSemester(Number(data.semesterAktif))
+                }
+            })
+            .catch(() => {})
     }, [canSelectKelas, userKelas])
 
     const fetchData = useCallback(async () => {
@@ -62,7 +82,7 @@ export default function NilaiPage() {
             setLoading(true)
             const [siswaRes, nilaiRes] = await Promise.all([
                 fetch(`/api/siswa?kelas=${kelas}`),
-                fetch(`/api/nilai?kelas=${kelas}&mapel=${encodeURIComponent(mapel)}&jenisNilai=${jenisNilai}`)
+                fetch(`/api/nilai?kelas=${kelas}&mapel=${encodeURIComponent(mapel)}&jenisNilai=${jenisNilai}&semester=${semester}`)
             ])
             const siswaData = await siswaRes.json()
             const nilaiData = await nilaiRes.json()
@@ -76,13 +96,14 @@ export default function NilaiPage() {
         } finally {
             setLoading(false)
         }
-    }, [kelas, mapel, jenisNilai])
+    }, [kelas, mapel, jenisNilai, semester])
 
     useEffect(() => {
         if (mapel && jenisNilai) fetchData()
-    }, [fetchData, mapel, jenisNilai])
+    }, [fetchData, mapel, jenisNilai, semester])
 
     const handleNilaiChange = (studentId: string, value: string) => {
+        if (isReadOnly) return
         const num = parseInt(value)
         if (value === "" || (num >= 0 && num <= 100)) {
             setNilai((prev) => ({ ...prev, [studentId]: num }))
@@ -90,16 +111,17 @@ export default function NilaiPage() {
     }
 
     const handleSave = async () => {
+        if (isReadOnly) return
         if (!mapel || !jenisNilai) { toast.error("Pilih mapel dan jenis nilai"); return }
         setSaving(true)
         try {
             const entries = Object.entries(nilai).filter(([, v]) => !isNaN(v)).map(([siswaId, nilaiValue]) => ({
-                siswaId, mapel, jenisNilai, nilai: nilaiValue
+                siswaId, mapel, jenisNilai, nilai: nilaiValue, semester
             }))
             const res = await fetch("/api/nilai", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ entries }),
+                body: JSON.stringify({ entries, semester }),
             })
             if (res.ok) toast.success("Nilai berhasil disimpan!")
             else toast.error("Gagal menyimpan")
@@ -112,11 +134,20 @@ export default function NilaiPage() {
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold tracking-tight text-[var(--foreground)]">Daftar Nilai Kelas {kelas}</h1>
-                    <p className="text-sm text-[var(--accents-5)] mt-1">Input penilaian siswa per mata pelajaran</p>
+                    <div className="flex items-center gap-2">
+                        <h1 className="text-2xl font-bold tracking-tight text-[var(--foreground)]">Daftar Nilai Kelas {kelas}</h1>
+                        {isReadOnly && (
+                            <span className="px-2.5 py-0.5 rounded text-xs bg-purple-100 text-purple-700 font-semibold border border-purple-200">
+                                Mode Supervisi (Pemantauan)
+                            </span>
+                        )}
+                    </div>
+                    <p className="text-sm text-[var(--accents-5)] mt-1">
+                        {isReadOnly ? "Pemantauan hasil penilaian capaian siswa per mata pelajaran" : "Input penilaian siswa per mata pelajaran"}
+                    </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
-                    {/* Class Selector untuk admin dan guru_mapel */}
+                    {/* Class Selector untuk admin, guru_mapel, pengawas, kepsek */}
                     {canSelectKelas ? (
                         <div className="relative">
                             <select
@@ -135,6 +166,21 @@ export default function NilaiPage() {
                             Kelas {kelas}
                         </span>
                     )}
+
+                    {/* Semester Selector */}
+                    <div className="relative">
+                        <select
+                            value={semester}
+                            onChange={(e) => setSemester(Number(e.target.value))}
+                            className="h-9 pl-3 pr-8 bg-white border border-[var(--border)] rounded-md text-sm text-[var(--foreground)] outline-none focus:ring-1 focus:ring-black cursor-pointer appearance-none"
+                        >
+                            <option value={1}>Semester 1</option>
+                            <option value={2}>Semester 2</option>
+                        </select>
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[var(--accents-5)]">
+                            <svg width="10" height="6" viewBox="0 0 10 6" fill="none"><path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                        </div>
+                    </div>
 
                     <div className="relative">
                         <select
@@ -164,20 +210,22 @@ export default function NilaiPage() {
                         </div>
                     </div>
 
-                    <button
-                        onClick={handleSave}
-                        disabled={saving}
-                        className="h-9 px-4 bg-black text-white rounded-md text-sm font-medium hover:bg-gray-800 disabled:opacity-50 transition-colors flex items-center gap-2 shadow-sm"
-                    >
-                        {saving ? (
-                            <>
-                                <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                <span>Menyimpan...</span>
-                            </>
-                        ) : (
-                            "Simpan"
-                        )}
-                    </button>
+                    {!isReadOnly && (
+                        <button
+                            onClick={handleSave}
+                            disabled={saving}
+                            className="h-9 px-4 bg-black text-white rounded-md text-sm font-medium hover:bg-gray-800 disabled:opacity-50 transition-colors flex items-center gap-2 shadow-sm"
+                        >
+                            {saving ? (
+                                <>
+                                    <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                    <span>Menyimpan...</span>
+                                </>
+                            ) : (
+                                "Simpan"
+                            )}
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -215,8 +263,12 @@ export default function NilaiPage() {
                                                     type="number"
                                                     min="0" max="100"
                                                     value={n ?? ""}
+                                                    disabled={isReadOnly}
                                                     onChange={(e) => handleNilaiChange(s.id, e.target.value)}
-                                                    className="w-20 px-3 py-1.5 bg-white border border-[var(--border)] rounded text-center font-bold text-sm text-[var(--foreground)] focus:ring-1 focus:ring-black focus:border-black outline-none transition-all placeholder:text-[var(--accents-3)]"
+                                                    className={`w-20 px-3 py-1.5 rounded text-center font-bold text-sm text-[var(--foreground)] outline-none transition-all placeholder:text-[var(--accents-3)] ${isReadOnly
+                                                        ? "bg-[var(--accents-1)] border border-[var(--border)] cursor-default"
+                                                        : "bg-white border border-[var(--border)] focus:ring-1 focus:ring-black focus:border-black"
+                                                        }`}
                                                     placeholder="-"
                                                 />
                                             </td>

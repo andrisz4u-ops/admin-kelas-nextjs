@@ -21,11 +21,15 @@ interface Siswa {
 export default function SiswaPage() {
     const { data: session } = useSession()
     const isAdmin = session?.user?.role === "admin"
+    const isPengawas = session?.user?.role === "pengawas"
+    const isKepsek = session?.user?.role === "kepsek"
+    const canSelectKelas = isAdmin || isPengawas || isKepsek
+    const isSupervisor = isPengawas || isKepsek
     const userKelas = session?.user?.kelas
 
     const [siswa, setSiswa] = useState<Siswa[]>([])
     const [loading, setLoading] = useState(true)
-    const [kelas, setKelas] = useState(userKelas || 5)
+    const [kelas, setKelas] = useState(userKelas || 1)
     const [showModal, setShowModal] = useState(false)
     const [showImportModal, setShowImportModal] = useState(false)
     const [editingSiswa, setEditingSiswa] = useState<Siswa | null>(null)
@@ -36,12 +40,20 @@ export default function SiswaPage() {
     const [searchQuery, setSearchQuery] = useState("") // Search NIS / Nama
     const [availableTahunLulus, setAvailableTahunLulus] = useState<string[]>([])
 
-    // Guru hanya bisa akses kelasnya sendiri
+    // Cek query param ?kelas= dan lock kelas untuk guru biasa
     useEffect(() => {
-        if (!isAdmin && userKelas) {
+        if (typeof window !== "undefined") {
+            const params = new URLSearchParams(window.location.search)
+            const qKelas = params.get("kelas")
+            if (qKelas && [1, 2, 3, 4, 5, 6].includes(Number(qKelas))) {
+                setKelas(Number(qKelas))
+                return
+            }
+        }
+        if (!canSelectKelas && userKelas) {
             setKelas(userKelas)
         }
-    }, [isAdmin, userKelas])
+    }, [canSelectKelas, userKelas])
 
     const fetchSiswa = useCallback(async () => {
         try {
@@ -314,13 +326,18 @@ export default function SiswaPage() {
             {/* Header & Action Bar */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold tracking-tight text-[var(--foreground)]">
-                        {showAlumni ? "🎓 Direktori Alumni SDN 2 Nangerang" : `Data Siswa Kelas ${kelas}`}
+                    <h1 className="text-2xl font-bold tracking-tight text-[var(--foreground)] flex items-center gap-2">
+                        <span>{showAlumni ? "🎓 Direktori Alumni SDN 2 Nangerang" : `Data Siswa Kelas ${kelas}`}</span>
+                        {isSupervisor && !showAlumni && (
+                            <span className="px-2 py-0.5 rounded text-xs bg-purple-100 text-purple-700 font-semibold border border-purple-200">
+                                Mode Supervisi
+                            </span>
+                        )}
                     </h1>
                     <p className="text-sm text-[var(--accents-5)] mt-1">
                         {showAlumni
                             ? `Arsip siswa yang telah lulus (${displayedSiswa.length} alumni ditampilkan)`
-                            : isAdmin ? `Kelola data siswa aktif (${displayedSiswa.length} siswa)` : `Daftar siswa aktif kelas ${kelas}`}
+                            : isSupervisor ? `Supervisi data siswa aktif (${displayedSiswa.length} siswa)` : isAdmin ? `Kelola data siswa aktif (${displayedSiswa.length} siswa)` : `Daftar siswa aktif kelas ${kelas}`}
                     </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -356,7 +373,7 @@ export default function SiswaPage() {
                     ) : (
                         <>
                             {/* Mode Siswa Aktif: Dropdown Kelas */}
-                            {isAdmin ? (
+                            {canSelectKelas ? (
                                 <div className="relative">
                                     <select
                                         value={kelas}

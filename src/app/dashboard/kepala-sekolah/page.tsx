@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import toast from "react-hot-toast"
 
 interface ClassSummary {
@@ -84,10 +85,12 @@ export default function PrincipalDashboard() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[var(--foreground)]">
-                        Dashboard Kepala Sekolah 🏫
+                        {isPengawas ? "Dashboard Pengawas Sekolah 🧐" : "Dashboard Kepala Sekolah 🏫"}
                     </h1>
                     <p className="text-sm text-[var(--accents-5)] mt-1">
-                        {schoolInfo?.namaSekolah || "SDN 2 Nangerang"} • Tahun Ajaran {schoolInfo?.tahunAjaran || "2025/2026"}
+                        {isPengawas
+                            ? `Supervisi & Pemantauan Akademik Seluruh Kelas • ${schoolInfo?.namaSekolah || "SDN 2 Nangerang"}`
+                            : `${schoolInfo?.namaSekolah || "SDN 2 Nangerang"} • Tahun Ajaran ${schoolInfo?.tahunAjaran || "2025/2026"}`}
                     </p>
                 </div>
                 {overview && (
@@ -283,6 +286,37 @@ function ClassCard({ data }: { data: ClassSummary }) {
                     </div>
                 </div>
             )}
+
+            {/* Direct Supervisi Links */}
+            <div className="mt-4 pt-3 border-t border-[var(--border)]">
+                <p className="text-[11px] font-semibold text-[var(--accents-5)] uppercase tracking-wider mb-2">Supervisi Kelas {data.kelas}</p>
+                <div className="grid grid-cols-2 gap-1.5 text-xs font-medium">
+                    <Link
+                        href={`/dashboard/jurnal?kelas=${data.kelas}`}
+                        className="px-2 py-1.5 rounded bg-purple-50 text-purple-700 hover:bg-purple-100 transition-colors text-center truncate flex items-center justify-center gap-1"
+                    >
+                        <span>📖</span> Jurnal
+                    </Link>
+                    <Link
+                        href={`/dashboard/absensi?kelas=${data.kelas}`}
+                        className="px-2 py-1.5 rounded bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors text-center truncate flex items-center justify-center gap-1"
+                    >
+                        <span>📋</span> Presensi
+                    </Link>
+                    <Link
+                        href={`/dashboard/nilai?kelas=${data.kelas}`}
+                        className="px-2 py-1.5 rounded bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors text-center truncate flex items-center justify-center gap-1"
+                    >
+                        <span>📊</span> Nilai
+                    </Link>
+                    <Link
+                        href={`/dashboard/siswa?kelas=${data.kelas}`}
+                        className="px-2 py-1.5 rounded bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors text-center truncate flex items-center justify-center gap-1"
+                    >
+                        <span>👥</span> Siswa
+                    </Link>
+                </div>
+            </div>
         </div>
     )
 }

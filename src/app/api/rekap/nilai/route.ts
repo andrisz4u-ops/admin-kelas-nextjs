@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
 
         const { searchParams } = new URL(request.url)
         const kelas = parseInt(searchParams.get("kelas") || "5")
-        const semester = parseInt(searchParams.get("semester") || "2")
+        const semester = parseInt(searchParams.get("semester") || "1")
         const mapel = searchParams.get("mapel") || "" // Optional: specific mapel
 
         // Get all active students in the class
@@ -28,15 +28,10 @@ export async function GET(request: NextRequest) {
             select: { id: true, nis: true, nama: true },
         })
 
-        // Determine which jenis nilai are for which semester
-        // Semester 1: UH1, UH2, UH3, UTS (mid), UAS (final of sem 1)
-        // Semester 2: UH1, UH2, UH3, UTS, UAS (but we treat them as different entries)
-        // For simplicity, we'll just fetch all nilai and let the user filter by semester in the UI
-        // In a more complex system, nilai would have a semester field
-
-        // Get all nilai for active students in the class
-        const whereClause: { siswa: { kelas: number; status: string }; mapel?: string } = {
+        // Get all nilai for active students in the class filtered by semester
+        const whereClause: { siswa: { kelas: number; status: string }; semester: number; mapel?: string } = {
             siswa: { kelas, status: "aktif" },
+            semester,
         }
         if (mapel) {
             whereClause.mapel = mapel

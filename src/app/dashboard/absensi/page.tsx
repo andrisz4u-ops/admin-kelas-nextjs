@@ -19,18 +19,29 @@ export default function AbsensiPage() {
     const { data: session } = useSession()
     const isAdmin = session?.user?.role === "admin"
     const isGuruMapel = session?.user?.role === "guru_mapel"
-    const canSelectKelas = isAdmin || isGuruMapel  // Admin dan guru_mapel bisa pilih kelas
+    const isPengawas = session?.user?.role === "pengawas"
+    const isKepsek = session?.user?.role === "kepsek"
+    const canSelectKelas = isAdmin || isGuruMapel || isPengawas || isKepsek
+    const isReadOnly = isPengawas || isKepsek
     const userKelas = session?.user?.kelas
 
     const [siswa, setSiswa] = useState<Siswa[]>([])
     const [absensi, setAbsensi] = useState<AbsensiData>({})
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
-    const [kelas, setKelas] = useState(userKelas || 1)  // Default ke kelas 1 untuk guru_mapel
+    const [kelas, setKelas] = useState(userKelas || 1)
     const [tanggal, setTanggal] = useState(getWIBDateString())
 
-    // Lock kelas untuk guru biasa saja
+    // Cek query param ?kelas= dan lock kelas untuk guru biasa saja
     useEffect(() => {
+        if (typeof window !== "undefined") {
+            const params = new URLSearchParams(window.location.search)
+            const qKelas = params.get("kelas")
+            if (qKelas && [1, 2, 3, 4, 5, 6].includes(Number(qKelas))) {
+                setKelas(Number(qKelas))
+                return
+            }
+        }
         if (!canSelectKelas && userKelas) {
             setKelas(userKelas)
         }
@@ -62,10 +73,12 @@ export default function AbsensiPage() {
     }, [fetchData])
 
     const handleStatusChange = (studentId: string, status: string) => {
+        if (isReadOnly) return
         setAbsensi((prev) => ({ ...prev, [studentId]: status }))
     }
 
     const handleSave = async () => {
+        if (isReadOnly) return
         setSaving(true)
         try {
             const entries = Object.entries(absensi).map(([siswaId, status]) => ({
@@ -102,11 +115,20 @@ export default function AbsensiPage() {
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold tracking-tight text-[var(--foreground)]">Daftar Hadir Kelas {kelas}</h1>
-                    <p className="text-sm text-[var(--accents-5)] mt-1">Kelola absensi harian siswa</p>
+                    <div className="flex items-center gap-2">
+                        <h1 className="text-2xl font-bold tracking-tight text-[var(--foreground)]">Daftar Hadir Kelas {kelas}</h1>
+                        {isReadOnly && (
+                            <span className="px-2.5 py-0.5 rounded text-xs bg-purple-100 text-purple-700 font-semibold border border-purple-200">
+                                Mode Supervisi (Pemantauan)
+                            </span>
+                        )}
+                    </div>
+                    <p className="text-sm text-[var(--accents-5)] mt-1">
+                        {isReadOnly ? "Pemantauan status kehadiran harian siswa" : "Kelola absensi harian siswa"}
+                    </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
-                    {/* Class Selector untuk admin dan guru_mapel */}
+                    {/* Class Selector untuk admin, guru_mapel, pengawas, kepsek */}
                     {canSelectKelas ? (
                         <div className="relative">
                             <select
@@ -138,20 +160,22 @@ export default function AbsensiPage() {
                         className="h-9 px-3 bg-white border border-[var(--border)] rounded-md text-sm text-[var(--foreground)] outline-none focus:ring-1 focus:ring-black"
                     />
 
-                    <button
-                        onClick={handleSave}
-                        disabled={saving}
-                        className="h-9 px-4 bg-black text-white rounded-md text-sm font-medium hover:bg-gray-800 disabled:opacity-50 transition-colors flex items-center gap-2"
-                    >
-                        {saving ? (
-                            <>
-                                <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                <span>Menyimpan...</span>
-                            </>
-                        ) : (
-                            "Simpan Perubahan"
-                        )}
-                    </button>
+                    {!isReadOnly && (
+                        <button
+                            onClick={handleSave}
+                            disabled={saving}
+                            className="h-9 px-4 bg-black text-white rounded-md text-sm font-medium hover:bg-gray-800 disabled:opacity-50 transition-colors flex items-center gap-2"
+                        >
+                            {saving ? (
+                                <>
+                                    <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                    <span>Menyimpan...</span>
+                                </>
+                            ) : (
+                                "Simpan Perubahan"
+                            )}
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -165,18 +189,20 @@ export default function AbsensiPage() {
                         </div>
                     ))}
                 </div>
-                <button
-                    onClick={() => {
-                        const newAbsensi: AbsensiData = { ...absensi }
-                        siswa.forEach(s => newAbsensi[s.id] = "H")
-                        setAbsensi(newAbsensi)
-                        toast.success("Semua siswa ditandai Hadir")
-                    }}
-                    className="px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full text-xs font-semibold hover:bg-emerald-100 transition-colors flex items-center gap-1.5"
-                >
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="2.5 6 4.5 9 9.5 3"></polyline></svg>
-                    Mark All Hadir
-                </button>
+                {!isReadOnly && (
+                    <button
+                        onClick={() => {
+                            const newAbsensi: AbsensiData = { ...absensi }
+                            siswa.forEach(s => newAbsensi[s.id] = "H")
+                            setAbsensi(newAbsensi)
+                            toast.success("Semua siswa ditandai Hadir")
+                        }}
+                        className="px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full text-xs font-semibold hover:bg-emerald-100 transition-colors flex items-center gap-1.5"
+                    >
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="2.5 6 4.5 9 9.5 3"></polyline></svg>
+                        Mark All Hadir
+                    </button>
+                )}
             </div>
 
             {/* Table - Turbo Card */}
@@ -210,8 +236,9 @@ export default function AbsensiPage() {
                                                         <button
                                                             key={opt.value}
                                                             onClick={() => handleStatusChange(s.id, opt.value)}
-                                                            className={`w-10 h-8 rounded-md flex items-center justify-center text-xs font-bold transition-all duration-150 ${isActive
-                                                                ? `${opt.color} text-white shadow-sm scale-105`
+                                                            disabled={isReadOnly}
+                                                            className={`w-10 h-8 rounded-md flex items-center justify-center text-xs font-bold transition-all duration-150 ${isReadOnly ? 'cursor-default' : 'cursor-pointer'} ${isActive
+                                                                ? `${opt.color} text-white shadow-sm ${isReadOnly ? '' : 'scale-105'}`
                                                                 : "bg-[var(--accents-1)] text-[var(--accents-5)] hover:bg-[var(--accents-2)] hover:text-[var(--foreground)] border border-[var(--border)]"
                                                                 }`}
                                                             title={opt.value === "H" ? "Hadir" : opt.value === "S" ? "Sakit" : opt.value === "I" ? "Izin" : "Alpha"}

@@ -30,6 +30,7 @@ model SchoolSettings {
   kepalaSekolah String?
   nipKepsek     String?
   tahunAjaran   String  @default("2025/2026")
+  semesterAktif Int     @default(1)
 }
 
 // Wali kelas per class
@@ -77,8 +78,9 @@ model Nilai {
   mapel      String
   jenisNilai String // UH1, UH2, UH3, UTS, UAS
   nilai      Float
+  semester   Int    @default(1)
 
-  @@unique([siswaId, mapel, jenisNilai])
+  @@unique([siswaId, mapel, jenisNilai, semester])
 }
 
 // Daily journal

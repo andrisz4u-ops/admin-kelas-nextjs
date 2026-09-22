@@ -8,7 +8,8 @@ export async function GET() {
         const settings = await prisma.schoolSettings.findFirst()
         return NextResponse.json(settings || {
             namaSekolah: "SDN 2 Nangerang",
-            tahunAjaran: "2025/2026"
+            tahunAjaran: "2025/2026",
+            semesterAktif: 1
         })
     } catch (error) {
         console.error("Error:", error)
@@ -24,12 +25,13 @@ export async function POST(request: Request) {
         }
 
         const body = await request.json()
-        const { namaSekolah, kepalaSekolah, nipKepsek, tahunAjaran } = body
+        const { namaSekolah, kepalaSekolah, nipKepsek, tahunAjaran, semesterAktif } = body
+        const parsedSemester = semesterAktif ? parseInt(String(semesterAktif)) : 1
 
         const settings = await prisma.schoolSettings.upsert({
             where: { id: "main" },
-            update: { namaSekolah, kepalaSekolah, nipKepsek, tahunAjaran },
-            create: { id: "main", namaSekolah, kepalaSekolah, nipKepsek, tahunAjaran },
+            update: { namaSekolah, kepalaSekolah, nipKepsek, tahunAjaran, semesterAktif: parsedSemester },
+            create: { id: "main", namaSekolah, kepalaSekolah, nipKepsek, tahunAjaran, semesterAktif: parsedSemester },
         })
 
         return NextResponse.json(settings)

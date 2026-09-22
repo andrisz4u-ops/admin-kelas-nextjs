@@ -55,23 +55,47 @@ interface AnalyticsData {
 export default function AnalitikNilaiPage() {
     const { data: session } = useSession()
     const isAdmin = session?.user?.role === "admin"
+    const isPengawas = session?.user?.role === "pengawas"
+    const isKepsek = session?.user?.role === "kepsek"
+    const canSelectKelas = isAdmin || isPengawas || isKepsek
     const userKelas = session?.user?.kelas
 
-    const [kelas, setKelas] = useState(userKelas || 5)
+    const [kelas, setKelas] = useState(userKelas || 1)
+    const [semester, setSemester] = useState(1)
     const [data, setData] = useState<AnalyticsData | null>(null)
     const [loading, setLoading] = useState(true)
     const [selectedStudent, setSelectedStudent] = useState<string | null>(null)
 
     useEffect(() => {
-        if (!isAdmin && userKelas) {
+        if (typeof window !== "undefined") {
+            const params = new URLSearchParams(window.location.search)
+            const qKelas = params.get("kelas")
+            if (qKelas && [1, 2, 3, 4, 5, 6].includes(Number(qKelas))) {
+                setKelas(Number(qKelas))
+            }
+        }
+        if (!canSelectKelas && userKelas) {
             setKelas(userKelas)
         }
-    }, [isAdmin, userKelas])
+
+        // Ambil semester aktif dari pengaturan sekolah
+        fetch("/api/settings/school")
+            .then(res => res.ok ? res.json() : null)
+            .then(data => {
+                if (data?.semesterAktif) {
+                    setSemester(Number(data.semesterAktif))
+                }
+            })
+            .catch(() => {})
+    }, [canSelectKelas, userKelas])
 
     const fetchData = useCallback(async () => {
         try {
             setLoading(true)
-            const params = new URLSearchParams({ kelas: kelas.toString() })
+            const params = new URLSearchParams({
+                kelas: kelas.toString(),
+                semester: semester.toString()
+            })
             if (selectedStudent) params.append("siswaId", selectedStudent)
 
             const res = await fetch(`/api/analytics/nilai?${params}`)
@@ -84,7 +108,7 @@ export default function AnalitikNilaiPage() {
         } finally {
             setLoading(false)
         }
-    }, [kelas, selectedStudent])
+    }, [kelas, semester, selectedStudent])
 
     useEffect(() => {
         fetchData()
@@ -117,7 +141,7 @@ export default function AnalitikNilaiPage() {
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
-                    {isAdmin ? (
+                    {canSelectKelas ? (
                         <div className="relative">
                             <select
                                 value={kelas}
@@ -135,6 +159,17 @@ export default function AnalitikNilaiPage() {
                             Kelas {kelas}
                         </span>
                     )}
+                    {/* Semester selector */}
+                    <div className="relative">
+                        <select
+                            value={semester}
+                            onChange={(e) => setSemester(Number(e.target.value))}
+                            className="h-9 pl-3 pr-8 bg-white border border-[var(--border)] rounded-md text-sm outline-none focus:ring-1 focus:ring-black cursor-pointer appearance-none"
+                        >
+                            <option value={1}>Semester 1</option>
+                            <option value={2}>Semester 2</option>
+                        </select>
+                    </div>
                     {data && data.students.length > 0 && (
                         <div className="relative">
                             <select

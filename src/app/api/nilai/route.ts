@@ -15,6 +15,7 @@ export async function GET(request: NextRequest) {
         const kelas = parseInt(searchParams.get("kelas") || "5")
         const mapel = searchParams.get("mapel")
         const jenisNilai = searchParams.get("jenisNilai")
+        const semester = parseInt(searchParams.get("semester") || "1")
 
         if (!mapel || !jenisNilai) {
             return NextResponse.json({ error: "Mapel and jenisNilai required" }, { status: 400 })
@@ -25,6 +26,7 @@ export async function GET(request: NextRequest) {
                 siswa: { kelas },
                 mapel,
                 jenisNilai,
+                semester,
             },
             select: {
                 siswaId: true,
@@ -47,15 +49,18 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
         }
 
-        const { entries } = await request.json()
+        const { entries, semester } = await request.json()
+        const fallbackSemester = semester ? parseInt(String(semester)) : 1
 
         for (const entry of entries) {
+            const entrySemester = entry.semester ? parseInt(String(entry.semester)) : fallbackSemester
             await prisma.nilai.upsert({
                 where: {
-                    siswaId_mapel_jenisNilai: {
+                    siswaId_mapel_jenisNilai_semester: {
                         siswaId: entry.siswaId,
                         mapel: entry.mapel,
                         jenisNilai: entry.jenisNilai,
+                        semester: entrySemester,
                     },
                 },
                 update: { nilai: entry.nilai },
@@ -63,6 +68,7 @@ export async function POST(request: NextRequest) {
                     siswaId: entry.siswaId,
                     mapel: entry.mapel,
                     jenisNilai: entry.jenisNilai,
+                    semester: entrySemester,
                     nilai: entry.nilai,
                 },
             })

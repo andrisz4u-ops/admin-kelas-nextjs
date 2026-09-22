@@ -205,6 +205,10 @@ export default function JurnalPage() {
     const { data: session } = useSession()
     const isAdmin = session?.user?.role === "admin"
     const isGuruMapel = session?.user?.role === "guru_mapel"
+    const isPengawas = session?.user?.role === "pengawas"
+    const isKepsek = session?.user?.role === "kepsek"
+    const canSelectKelas = isAdmin || isGuruMapel || isPengawas || isKepsek
+    const isSupervisor = isPengawas || isKepsek
     const userKelas = session?.user?.kelas
 
     const [jurnal, setJurnal] = useState<Jurnal[]>([])
@@ -215,7 +219,7 @@ export default function JurnalPage() {
 
     // Selector: 1-6 untuk Wali Kelas, atau "PAI" untuk Guru Mapel PAI
     const [selectedViewKey, setSelectedViewKey] = useState<string>(
-        isGuruMapel ? "PAI" : (userKelas ? String(userKelas) : "5")
+        isGuruMapel ? "PAI" : (userKelas ? String(userKelas) : "1")
     )
 
     const isModePAI = selectedViewKey === "PAI"
@@ -239,12 +243,20 @@ export default function JurnalPage() {
     // Subjects for current class
     const mapelList = getMapelByKelas(currentKelas)
 
-    // Lock class for regular teacher
+    // Cek query param ?kelas= dan lock kelas untuk wali kelas biasa
     useEffect(() => {
-        if (!isAdmin && !isGuruMapel && userKelas) {
+        if (typeof window !== "undefined") {
+            const params = new URLSearchParams(window.location.search)
+            const qKelas = params.get("kelas")
+            if (qKelas && ([1, 2, 3, 4, 5, 6].includes(Number(qKelas)) || qKelas === "PAI")) {
+                setSelectedViewKey(String(qKelas))
+                return
+            }
+        }
+        if (!canSelectKelas && userKelas) {
             setSelectedViewKey(String(userKelas))
         }
-    }, [isAdmin, isGuruMapel, userKelas])
+    }, [canSelectKelas, userKelas])
 
     // Load school settings, wali kelas
     useEffect(() => {
@@ -499,17 +511,26 @@ export default function JurnalPage() {
             {/* Header */}
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold tracking-tight text-[var(--foreground)]">
-                        Agenda Mengajar Guru (Jurnal Harian)
-                    </h1>
+                    <div className="flex items-center gap-2">
+                        <h1 className="text-2xl font-bold tracking-tight text-[var(--foreground)]">
+                            Agenda Mengajar Guru (Jurnal Harian)
+                        </h1>
+                        {isSupervisor && (
+                            <span className="px-2.5 py-0.5 rounded text-xs bg-purple-100 text-purple-700 font-semibold border border-purple-200">
+                                Mode Supervisi
+                            </span>
+                        )}
+                    </div>
                     <p className="text-sm text-[var(--accents-5)] mt-1">
-                        Buku agenda harian pelaksanaan KBM per hari, terintegrasi otomatis dengan jadwal dan presensi siswa
+                        {isSupervisor
+                            ? "Pemantauan pelaksanaan agenda KBM harian guru dan kehadiran siswa"
+                            : "Buku agenda harian pelaksanaan KBM per hari, terintegrasi otomatis dengan jadwal dan presensi siswa"}
                     </p>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2.5">
                     {/* Class / Subject Mode Selector */}
-                    {(isAdmin || isGuruMapel) ? (
+                    {canSelectKelas ? (
                         <div className="relative">
                             <select
                                 value={selectedViewKey}
@@ -531,17 +552,19 @@ export default function JurnalPage() {
                         </span>
                     )}
 
-                    {/* Tombol Isi Otomatis dari Jadwal */}
-                    <button
-                        onClick={() => setShowAutoFillModal(true)}
-                        className="h-9 px-3.5 bg-purple-600 text-white rounded-md text-sm font-medium hover:bg-purple-700 transition-colors flex items-center gap-2 shadow-sm"
-                        title="Isi Otomatis Agenda Hari Ini Berdasarkan Jadwal Pelajaran"
-                    >
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
-                        </svg>
-                        <span>Isi dari Jadwal</span>
-                    </button>
+                    {/* Tombol Isi Otomatis dari Jadwal - sembunyikan untuk Pengawas */}
+                    {!isPengawas && (
+                        <button
+                            onClick={() => setShowAutoFillModal(true)}
+                            className="h-9 px-3.5 bg-purple-600 text-white rounded-md text-sm font-medium hover:bg-purple-700 transition-colors flex items-center gap-2 shadow-sm"
+                            title="Isi Otomatis Agenda Hari Ini Berdasarkan Jadwal Pelajaran"
+                        >
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                            </svg>
+                            <span>Isi dari Jadwal</span>
+                        </button>
+                    )}
 
                     {/* Tombol Cetak / Print Per Hari (1 Lembar) */}
                     <button
@@ -557,16 +580,18 @@ export default function JurnalPage() {
                         Cetak Agenda
                     </button>
 
-                    {/* Tombol Tambah Catatan Manual */}
-                    <button
-                        onClick={() => { setEditingJurnal(null); setShowModal(true) }}
-                        className="h-9 px-4 bg-black text-white rounded-md text-sm font-medium hover:bg-gray-800 transition-colors flex items-center gap-2 shadow-sm"
-                    >
-                        <svg width="13" height="13" viewBox="0 0 12 12" fill="none">
-                            <path d="M6 2.5V9.5M2.5 6H9.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                        Tambah Agenda
-                    </button>
+                    {/* Tombol Tambah Catatan Manual - sembunyikan untuk Pengawas */}
+                    {!isPengawas && (
+                        <button
+                            onClick={() => { setEditingJurnal(null); setShowModal(true) }}
+                            className="h-9 px-4 bg-black text-white rounded-md text-sm font-medium hover:bg-gray-800 transition-colors flex items-center gap-2 shadow-sm"
+                        >
+                            <svg width="13" height="13" viewBox="0 0 12 12" fill="none">
+                                <path d="M6 2.5V9.5M2.5 6H9.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                            Tambah Agenda
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -800,7 +825,9 @@ export default function JurnalPage() {
                                 <th rowSpan={2} className="border border-gray-400 px-2 py-2.5 w-16">JML TDK HADIR</th>
                                 <th rowSpan={2} className="border border-gray-400 px-3 py-2.5 min-w-[160px] text-left">KET</th>
                                 <th rowSpan={2} className="border border-gray-400 px-2 py-2.5 w-14">PARAF</th>
-                                <th rowSpan={2} className="border border-gray-400 px-2 py-2.5 w-20 no-print">AKSI</th>
+                                {!isPengawas && (
+                                    <th rowSpan={2} className="border border-gray-400 px-2 py-2.5 w-20 no-print">AKSI</th>
+                                )}
                             </tr>
                             <tr className="bg-[#dae3f3] text-gray-900 border-b border-gray-300 font-bold text-center">
                                 <th className="border border-gray-400 px-2 py-1 w-9 text-amber-900">S</th>
@@ -811,28 +838,32 @@ export default function JurnalPage() {
                         <tbody>
                             {loading ? (
                                 <tr>
-                                    <td colSpan={viewMode === "HARIAN" ? (isModePAI ? 13 : 12) : (isModePAI ? 14 : 13)} className="text-center py-10 text-gray-500">
+                                    <td colSpan={(viewMode === "HARIAN" ? (isModePAI ? 13 : 12) : (isModePAI ? 14 : 13)) - (isPengawas ? 1 : 0)} className="text-center py-10 text-gray-500">
                                         Memuat data agenda mengajar...
                                     </td>
                                 </tr>
                             ) : filteredJurnal.length === 0 ? (
                                 <tr>
-                                    <td colSpan={viewMode === "HARIAN" ? (isModePAI ? 13 : 12) : (isModePAI ? 14 : 13)} className="text-center py-12 text-gray-500">
+                                    <td colSpan={(viewMode === "HARIAN" ? (isModePAI ? 13 : 12) : (isModePAI ? 14 : 13)) - (isPengawas ? 1 : 0)} className="text-center py-12 text-gray-500">
                                         <div className="flex flex-col items-center justify-center max-w-md mx-auto">
                                             <span className="text-4xl mb-2">📋</span>
                                             <p className="font-semibold text-gray-900 text-sm">
                                                 Belum ada agenda mengajar pada {viewMode === "HARIAN" ? formatDateFull(selectedDate) : "periode ini"}
                                             </p>
                                             <p className="text-xs text-gray-500 mt-1 mb-3 text-center">
-                                                Klik tombol <span className="font-bold text-purple-700">"Isi dari Jadwal"</span> untuk memasukkan mata pelajaran hari ini beserta data absensi siswa secara otomatis.
+                                                {isPengawas
+                                                    ? "Guru kelas belum menginput agenda mengajar pada tanggal ini."
+                                                    : 'Klik tombol "Isi dari Jadwal" untuk memasukkan mata pelajaran hari ini beserta data absensi siswa secara otomatis.'}
                                             </p>
-                                            <button
-                                                onClick={() => setShowAutoFillModal(true)}
-                                                className="px-4 py-2 bg-purple-600 text-white rounded-md text-xs font-semibold hover:bg-purple-700 transition-colors flex items-center gap-2 shadow-sm"
-                                            >
-                                                <span>⚡</span>
-                                                <span>Isi Otomatis dari Jadwal Hari Ini</span>
-                                            </button>
+                                            {!isPengawas && (
+                                                <button
+                                                    onClick={() => setShowAutoFillModal(true)}
+                                                    className="px-4 py-2 bg-purple-600 text-white rounded-md text-xs font-semibold hover:bg-purple-700 transition-colors flex items-center gap-2 shadow-sm"
+                                                >
+                                                    <span>⚡</span>
+                                                    <span>Isi Otomatis dari Jadwal Hari Ini</span>
+                                                </button>
+                                            )}
                                         </div>
                                     </td>
                                 </tr>
@@ -910,35 +941,46 @@ export default function JurnalPage() {
                                             </td>
                                             {/* PARAF */}
                                             <td className="border border-gray-300 px-2 py-2.5 text-center">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleToggleParaf(item)}
-                                                    title="Klik untuk ubah paraf guru"
-                                                    className={`inline-block px-2 py-0.5 rounded text-[11px] font-bold transition-all ${item.paraf === "✓"
-                                                        ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200"
-                                                        : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-                                                        }`}
-                                                >
-                                                    {item.paraf || "-"}
-                                                </button>
+                                                {isPengawas ? (
+                                                    <span className={`inline-block px-2 py-0.5 rounded text-[11px] font-bold ${item.paraf === "✓"
+                                                        ? "bg-emerald-100 text-emerald-800"
+                                                        : "bg-gray-100 text-gray-500"
+                                                        }`}>
+                                                        {item.paraf || "-"}
+                                                    </span>
+                                                ) : (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleToggleParaf(item)}
+                                                        title="Klik untuk ubah paraf guru"
+                                                        className={`inline-block px-2 py-0.5 rounded text-[11px] font-bold transition-all ${item.paraf === "✓"
+                                                            ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200"
+                                                            : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                                                            }`}
+                                                    >
+                                                        {item.paraf || "-"}
+                                                    </button>
+                                                )}
                                             </td>
                                             {/* ACTION */}
-                                            <td className="border border-gray-300 px-2 py-2.5 text-center no-print whitespace-nowrap">
-                                                <button
-                                                    onClick={() => { setEditingJurnal(item); setShowModal(true) }}
-                                                    className="p-1 text-blue-600 hover:text-blue-900 rounded hover:bg-blue-50 mr-1"
-                                                    title="Edit"
-                                                >
-                                                    ✏️
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDelete(item.id)}
-                                                    className="p-1 text-red-600 hover:text-red-900 rounded hover:bg-red-50"
-                                                    title="Hapus"
-                                                >
-                                                    🗑️
-                                                </button>
-                                            </td>
+                                            {!isPengawas && (
+                                                <td className="border border-gray-300 px-2 py-2.5 text-center no-print whitespace-nowrap">
+                                                    <button
+                                                        onClick={() => { setEditingJurnal(item); setShowModal(true) }}
+                                                        className="p-1 text-blue-600 hover:text-blue-900 rounded hover:bg-blue-50 mr-1"
+                                                        title="Edit"
+                                                    >
+                                                        ✏️
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDelete(item.id)}
+                                                        className="p-1 text-red-600 hover:text-red-900 rounded hover:bg-red-50"
+                                                        title="Hapus"
+                                                    >
+                                                        🗑️
+                                                    </button>
+                                                </td>
+                                            )}
                                         </tr>
                                     )
                                 })

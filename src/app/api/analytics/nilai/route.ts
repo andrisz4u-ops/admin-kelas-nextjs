@@ -16,6 +16,7 @@ export async function GET(request: NextRequest) {
         const { searchParams } = new URL(request.url)
         const kelas = parseInt(searchParams.get("kelas") || "5")
         const siswaId = searchParams.get("siswaId") || null
+        const semester = parseInt(searchParams.get("semester") || "1")
 
         // Get all active students in class
         const students = await prisma.siswa.findMany({
@@ -24,9 +25,12 @@ export async function GET(request: NextRequest) {
             select: { id: true, nis: true, nama: true }
         })
 
-        // Get all grades for active students in the class
+        // Get all grades for active students in the class filtered by semester
         const grades = await prisma.nilai.findMany({
-            where: { siswa: { kelas, status: "aktif" } },
+            where: {
+                siswa: { kelas, status: "aktif" },
+                semester,
+            },
             include: { siswa: { select: { id: true, nama: true } } }
         })
 
