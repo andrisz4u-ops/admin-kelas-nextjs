@@ -90,9 +90,16 @@ model Jurnal {
   mapel      String
   materi     String
   metode     String
-  catatan    String?
-  siswaAbsen String?
-  createdAt  DateTime @default(now())
+  catatan     String?
+  siswaAbsen  String?
+  kategori    String?  @default("KBM") // "KBM" (Pembelajaran) atau "AGENDA" (Agenda Dinas/Non-KBM)
+  jmlSakit    Int?     @default(0)
+  jmlIzin     Int?     @default(0)
+  jmlAlpha    Int?     @default(0)
+  jmlHadir    Int?
+  jmlTdkHadir Int?     @default(0)
+  paraf       String?
+  createdAt   DateTime @default(now())
 
   @@index([kelas, tanggal])
 }

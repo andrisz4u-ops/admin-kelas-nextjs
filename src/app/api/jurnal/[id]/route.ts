@@ -16,7 +16,22 @@ export async function PUT(
 
         const { id } = await params
         const body = await request.json()
-        const { tanggal, jamKe, mapel, materi, metode, catatan, siswaAbsen } = body
+        const {
+            tanggal,
+            jamKe,
+            mapel,
+            materi,
+            metode,
+            catatan,
+            siswaAbsen,
+            kategori,
+            jmlSakit,
+            jmlIzin,
+            jmlAlpha,
+            jmlHadir,
+            jmlTdkHadir,
+            paraf
+        } = body
 
         const jurnal = await prisma.jurnal.update({
             where: { id },
@@ -25,9 +40,16 @@ export async function PUT(
                 jamKe,
                 mapel,
                 materi,
-                metode,
+                metode: metode || "-",
                 catatan,
                 siswaAbsen,
+                kategori: kategori || "KBM",
+                jmlSakit: jmlSakit !== undefined ? Number(jmlSakit) : 0,
+                jmlIzin: jmlIzin !== undefined ? Number(jmlIzin) : 0,
+                jmlAlpha: jmlAlpha !== undefined ? Number(jmlAlpha) : 0,
+                jmlHadir: jmlHadir !== undefined ? Number(jmlHadir) : null,
+                jmlTdkHadir: jmlTdkHadir !== undefined ? Number(jmlTdkHadir) : 0,
+                paraf: paraf || null,
             },
         })
 

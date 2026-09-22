@@ -12,10 +12,21 @@ export async function GET(request: NextRequest) {
         }
 
         const { searchParams } = new URL(request.url)
-        const kelas = parseInt(searchParams.get("kelas") || "5")
+        const kelasParam = searchParams.get("kelas")
+        const mapelParam = searchParams.get("mapel")
+
+        const whereClause: any = {}
+        if (kelasParam && kelasParam !== "ALL") {
+            whereClause.kelas = parseInt(kelasParam)
+        } else if (!kelasParam) {
+            whereClause.kelas = 5
+        }
+        if (mapelParam) {
+            whereClause.mapel = { contains: mapelParam, mode: "insensitive" }
+        }
 
         const jurnal = await prisma.jurnal.findMany({
-            where: { kelas },
+            where: whereClause,
             orderBy: { tanggal: "desc" },
         })
 
@@ -35,7 +46,52 @@ export async function POST(request: NextRequest) {
         }
 
         const body = await request.json()
-        const { tanggal, jamKe, mapel, materi, metode, catatan, siswaAbsen, kelas } = body
+
+        // Batch creation support
+        if (Array.isArray(body)) {
+            const createdList = await prisma.$transaction(
+                body.map(item =>
+                    prisma.jurnal.create({
+                        data: {
+                            tanggal: new Date(item.tanggal),
+                            jamKe: item.jamKe,
+                            mapel: item.mapel,
+                            materi: item.materi || "Pembelajaran sesuai modul / silabus",
+                            metode: item.metode || "-",
+                            catatan: item.catatan || null,
+                            siswaAbsen: item.siswaAbsen || null,
+                            kategori: item.kategori || "KBM",
+                            jmlSakit: item.jmlSakit !== undefined ? Number(item.jmlSakit) : 0,
+                            jmlIzin: item.jmlIzin !== undefined ? Number(item.jmlIzin) : 0,
+                            jmlAlpha: item.jmlAlpha !== undefined ? Number(item.jmlAlpha) : 0,
+                            jmlHadir: item.jmlHadir !== undefined ? Number(item.jmlHadir) : null,
+                            jmlTdkHadir: item.jmlTdkHadir !== undefined ? Number(item.jmlTdkHadir) : 0,
+                            paraf: item.paraf || null,
+                            kelas: parseInt(item.kelas),
+                        }
+                    })
+                )
+            )
+            return NextResponse.json(createdList, { status: 201 })
+        }
+
+        const {
+            tanggal,
+            jamKe,
+            mapel,
+            materi,
+            metode,
+            catatan,
+            siswaAbsen,
+            kelas,
+            kategori,
+            jmlSakit,
+            jmlIzin,
+            jmlAlpha,
+            jmlHadir,
+            jmlTdkHadir,
+            paraf
+        } = body
 
         const jurnal = await prisma.jurnal.create({
             data: {
@@ -43,9 +99,16 @@ export async function POST(request: NextRequest) {
                 jamKe,
                 mapel,
                 materi,
-                metode,
+                metode: metode || "-",
                 catatan,
                 siswaAbsen,
+                kategori: kategori || "KBM",
+                jmlSakit: jmlSakit !== undefined ? Number(jmlSakit) : 0,
+                jmlIzin: jmlIzin !== undefined ? Number(jmlIzin) : 0,
+                jmlAlpha: jmlAlpha !== undefined ? Number(jmlAlpha) : 0,
+                jmlHadir: jmlHadir !== undefined ? Number(jmlHadir) : null,
+                jmlTdkHadir: jmlTdkHadir !== undefined ? Number(jmlTdkHadir) : 0,
+                paraf: paraf || null,
                 kelas: parseInt(kelas),
             },
         })

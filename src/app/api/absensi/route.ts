@@ -40,6 +40,12 @@ export async function GET(request: NextRequest) {
             select: {
                 siswaId: true,
                 status: true,
+                siswa: {
+                    select: {
+                        nama: true,
+                        nis: true,
+                    },
+                },
             },
         })
 
@@ -58,17 +64,22 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
         }
 
-        const { entries } = await request.json()
+        const body = await request.json()
+        const entries = body.entries
+        const kelasParam = body.kelas ? parseInt(body.kelas) : null
 
         if (!Array.isArray(entries)) {
             return NextResponse.json({ error: "Entries harus berupa array" }, { status: 400 })
         }
+
+        let targetDateNormalized: Date | null = null
 
         for (const entry of entries) {
             // Strict Date Parsing: YYYY-MM-DD -> UTC Midnight
             const dateStr = new Date(entry.tanggal).toISOString().split('T')[0]
             const [y, m, d] = dateStr.split('-').map(Number)
             const dateNormalized = new Date(Date.UTC(y, m - 1, d, 0, 0, 0, 0))
+            if (!targetDateNormalized) targetDateNormalized = dateNormalized
 
             await prisma.absensi.upsert({
                 where: {
@@ -86,7 +97,57 @@ export async function POST(request: NextRequest) {
             })
         }
 
-        return NextResponse.json({ message: "Absensi saved" })
+        // Sinkronisasi otomatis ke Agenda Mengajar (Jurnal) untuk kelas & tanggal ini
+        if (targetDateNormalized && kelasParam) {
+            try {
+                const absentList = await prisma.absensi.findMany({
+                    where: {
+                        siswa: { kelas: kelasParam, status: "aktif" },
+                        tanggal: targetDateNormalized,
+                    },
+                    include: {
+                        siswa: { select: { nama: true } }
+                    }
+                })
+
+                const sNames = absentList.filter(a => a.status === "S").map(a => a.siswa.nama)
+                const iNames = absentList.filter(a => a.status === "I").map(a => a.siswa.nama)
+                const aNames = absentList.filter(a => a.status === "A").map(a => a.siswa.nama)
+
+                const s = sNames.length
+                const i = iNames.length
+                const a = aNames.length
+                const tdkHadir = s + i + a
+                const totalSiswa = await prisma.siswa.count({ where: { kelas: kelasParam, status: "aktif" } })
+                const hadir = Math.max(0, totalSiswa - tdkHadir)
+
+                const parts: string[] = []
+                if (sNames.length > 0) parts.push(`Sakit: ${sNames.join(", ")}`)
+                if (iNames.length > 0) parts.push(`Izin: ${iNames.join(", ")}`)
+                if (aNames.length > 0) parts.push(`Alpa: ${aNames.join(", ")}`)
+                const siswaAbsenText = parts.length > 0 ? parts.join(" | ") : null
+
+                // Update semua jurnal pada kelas dan tanggal bersangkutan
+                await prisma.jurnal.updateMany({
+                    where: {
+                        kelas: kelasParam,
+                        tanggal: targetDateNormalized,
+                    },
+                    data: {
+                        jmlSakit: s,
+                        jmlIzin: i,
+                        jmlAlpha: a,
+                        jmlHadir: hadir,
+                        jmlTdkHadir: tdkHadir,
+                        siswaAbsen: siswaAbsenText,
+                    }
+                })
+            } catch (syncErr) {
+                console.warn("Auto-sync absensi to jurnal warning:", syncErr)
+            }
+        }
+
+        return NextResponse.json({ message: "Absensi saved and synced to Jurnal" })
     } catch (error) {
         console.error("Error saving absensi:", error)
         return NextResponse.json({ error: "Internal server error" }, { status: 500 })

@@ -31,7 +31,7 @@ const menuItems: MenuItem[] = [
     { href: "/dashboard/siswa", icon: "users", label: "Data Siswa", guruOnly: true },
     { href: "/dashboard/absensi", icon: "clipboard-check", label: "Daftar Hadir", guruOnly: true },
     { href: "/dashboard/nilai", icon: "chart-line", label: "Daftar Nilai", guruOnly: true },
-    { href: "/dashboard/jurnal", icon: "book", label: "Jurnal Harian", guruOnly: true },
+    { href: "/dashboard/jurnal", icon: "book", label: "Jurnal & Agenda", guruOnly: true },
     { href: "/dashboard/jadwal", icon: "calendar-days", label: "Jadwal Pelajaran", guruOnly: false, allRoles: true }, // Accessible for Admin (to edit) & Guru (to view/edit)
     { href: "/dashboard/kalender", icon: "calendar", label: "Kalender Akademik" },
 
