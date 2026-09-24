@@ -60,14 +60,17 @@ model Siswa {
 
 // Daily attendance
 model Absensi {
-  id      String   @id @default(cuid())
-  siswaId String
-  siswa   Siswa    @relation(fields: [siswaId], references: [id], onDelete: Cascade)
-  tanggal DateTime @db.Date
-  status  String   // H, S, I, A
+  id          String   @id @default(cuid())
+  siswaId     String
+  siswa       Siswa    @relation(fields: [siswaId], references: [id], onDelete: Cascade)
+  tanggal     DateTime @db.Date
+  status      String   // H, S, I, A
+  tahunAjaran String   @default("2026/2027")
+  semester    Int      @default(1)
 
   @@unique([siswaId, tanggal])
   @@index([tanggal])
+  @@index([tahunAjaran, semester])
 }
 
 // Grades
@@ -90,13 +93,13 @@ model Nilai {
 
 // Daily journal
 model Jurnal {
-  id         String   @id @default(cuid())
-  kelas      Int
-  tanggal    DateTime @db.Date
-  jamKe      String
-  mapel      String
-  materi     String
-  metode     String
+  id          String   @id @default(cuid())
+  kelas       Int
+  tanggal     DateTime @db.Date
+  jamKe       String
+  mapel       String
+  materi      String
+  metode      String
   catatan     String?
   siswaAbsen  String?
   kategori    String?  @default("KBM") // "KBM" (Pembelajaran) atau "AGENDA" (Agenda Dinas/Non-KBM)
@@ -106,9 +109,12 @@ model Jurnal {
   jmlHadir    Int?
   jmlTdkHadir Int?     @default(0)
   paraf       String?
+  tahunAjaran String   @default("2026/2027")
+  semester    Int      @default(1)
   createdAt   DateTime @default(now())
 
   @@index([kelas, tanggal])
+  @@index([tahunAjaran, semester])
 }
 
 // Custom mapel names per class (overrides default config)

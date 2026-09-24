@@ -6,6 +6,17 @@ import { parseToUTCMidnight } from "@/lib/dateUtils"
 
 export const dynamic = 'force-dynamic'
 
+// Helper: determine tahunAjaran & semester from a date
+function determineTahunAjaranSemester(date: Date): { tahunAjaran: string; semester: number } {
+    const month = date.getUTCMonth() // 0-indexed
+    const year = date.getUTCFullYear()
+    if (month >= 6) { // Juli-Desember = Semester 1
+        return { tahunAjaran: `${year}/${year + 1}`, semester: 1 }
+    } else { // Januari-Juni = Semester 2
+        return { tahunAjaran: `${year - 1}/${year}`, semester: 2 }
+    }
+}
+
 // GET absensi for a class and date
 export async function GET(request: NextRequest) {
     try {
@@ -71,6 +82,8 @@ export async function POST(request: NextRequest) {
         const body = await request.json()
         const entries = body.entries
         const kelasParam = body.kelas ? parseInt(body.kelas) : null
+        const bodyTahunAjaran = body.tahunAjaran
+        const bodySemester = body.semester ? parseInt(body.semester) : null
 
         if (!Array.isArray(entries) || entries.length === 0) {
             return NextResponse.json({ error: "Entries harus berupa array yang tidak kosong" }, { status: 400 })
@@ -86,12 +99,28 @@ export async function POST(request: NextRequest) {
             }, { status: 403 })
         }
 
+        // Resolve tahunAjaran default: from body, or from school settings
+        let defaultTahunAjaran = bodyTahunAjaran
+        let defaultSemester = bodySemester
+        if (!defaultTahunAjaran) {
+            const settings = await prisma.schoolSettings.findFirst()
+            defaultTahunAjaran = settings?.tahunAjaran || "2026/2027"
+            if (!defaultSemester) {
+                defaultSemester = settings?.semesterAktif || 1
+            }
+        }
+
         let targetDateNormalized: Date | null = null
 
         // Siapkan batch operasi upsert
         const upsertOps = entries.map((entry) => {
             const dateNormalized = parseToUTCMidnight(entry.tanggal)
             if (!targetDateNormalized) targetDateNormalized = dateNormalized
+
+            // Auto-determine tahunAjaran & semester from the date if not provided
+            const autoDetected = determineTahunAjaranSemester(dateNormalized)
+            const entryTahunAjaran = entry.tahunAjaran || defaultTahunAjaran || autoDetected.tahunAjaran
+            const entrySemester = entry.semester ? parseInt(entry.semester) : (defaultSemester || autoDetected.semester)
 
             return prisma.absensi.upsert({
                 where: {
@@ -100,11 +129,17 @@ export async function POST(request: NextRequest) {
                         tanggal: dateNormalized,
                     },
                 },
-                update: { status: entry.status },
+                update: {
+                    status: entry.status,
+                    tahunAjaran: entryTahunAjaran,
+                    semester: entrySemester,
+                },
                 create: {
                     siswaId: entry.siswaId,
                     tanggal: dateNormalized,
                     status: entry.status,
+                    tahunAjaran: entryTahunAjaran,
+                    semester: entrySemester,
                 },
             })
         })

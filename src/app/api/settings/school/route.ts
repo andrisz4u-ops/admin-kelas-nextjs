@@ -24,7 +24,13 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
         }
 
+        // Hanya admin yang boleh mengubah pengaturan sekolah
+        if (session.user.role !== "admin") {
+            return NextResponse.json({ error: "Hanya admin yang dapat mengubah pengaturan sekolah." }, { status: 403 })
+        }
+
         const body = await request.json()
+
         const { namaSekolah, kepalaSekolah, nipKepsek, tahunAjaran, semesterAktif } = body
         const parsedSemester = semesterAktif ? parseInt(String(semesterAktif)) : 1
 

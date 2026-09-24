@@ -6,6 +6,17 @@ import { parseToUTCMidnight } from "@/lib/dateUtils"
 
 export const dynamic = 'force-dynamic'
 
+// Helper: determine tahunAjaran & semester from a date
+function determineTahunAjaranSemester(date: Date): { tahunAjaran: string; semester: number } {
+    const month = date.getUTCMonth() // 0-indexed
+    const year = date.getUTCFullYear()
+    if (month >= 6) { // Juli-Desember = Semester 1
+        return { tahunAjaran: `${year}/${year + 1}`, semester: 1 }
+    } else { // Januari-Juni = Semester 2
+        return { tahunAjaran: `${year - 1}/${year}`, semester: 2 }
+    }
+}
+
 // GET jurnal for a class
 export async function GET(request: NextRequest) {
     try {
@@ -17,6 +28,8 @@ export async function GET(request: NextRequest) {
         const { searchParams } = new URL(request.url)
         const kelasParam = searchParams.get("kelas")
         const mapelParam = searchParams.get("mapel")
+        const tahunAjaranParam = searchParams.get("tahunAjaran")
+        const semesterParam = searchParams.get("semester")
 
         const whereClause: any = {}
         if (kelasParam && kelasParam !== "ALL") {
@@ -26,6 +39,14 @@ export async function GET(request: NextRequest) {
         }
         if (mapelParam) {
             whereClause.mapel = { contains: mapelParam, mode: "insensitive" }
+        }
+
+        // Filter by tahunAjaran if provided, otherwise use school settings
+        if (tahunAjaranParam) {
+            whereClause.tahunAjaran = tahunAjaranParam
+        }
+        if (semesterParam) {
+            whereClause.semester = parseInt(semesterParam)
         }
 
         const jurnal = await prisma.jurnal.findMany({
@@ -48,15 +69,32 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
         }
 
+        const userRole = session.user.role
+
+        // Kepsek & Pengawas bersifat Read-Only untuk jurnal
+        if (userRole === "kepsek" || userRole === "pengawas") {
+            return NextResponse.json({ error: "Role Anda hanya memiliki izin baca (view-only)." }, { status: 403 })
+        }
+
+        // Resolve default tahunAjaran from school settings
+        const settings = await prisma.schoolSettings.findFirst()
+        const defaultTahunAjaran = settings?.tahunAjaran || "2026/2027"
+        const defaultSemester = settings?.semesterAktif || 1
+
         const body = await request.json()
 
         // Batch creation support
         if (Array.isArray(body)) {
             const createdList = await prisma.$transaction(
-                body.map(item =>
-                    prisma.jurnal.create({
+                body.map(item => {
+                    const tanggal = parseToUTCMidnight(item.tanggal)
+                    const autoDetected = determineTahunAjaranSemester(tanggal)
+                    const tahunAjaran = item.tahunAjaran || defaultTahunAjaran || autoDetected.tahunAjaran
+                    const semester = item.semester ? parseInt(item.semester) : (defaultSemester || autoDetected.semester)
+
+                    return prisma.jurnal.create({
                         data: {
-                            tanggal: parseToUTCMidnight(item.tanggal),
+                            tanggal,
                             jamKe: item.jamKe,
                             mapel: item.mapel,
                             materi: item.materi || "Pembelajaran sesuai modul / silabus",
@@ -71,9 +109,11 @@ export async function POST(request: NextRequest) {
                             jmlTdkHadir: item.jmlTdkHadir !== undefined ? Number(item.jmlTdkHadir) : 0,
                             paraf: item.paraf || null,
                             kelas: parseInt(item.kelas),
+                            tahunAjaran,
+                            semester,
                         }
                     })
-                )
+                })
             )
             return NextResponse.json(createdList, { status: 201 })
         }
@@ -93,12 +133,19 @@ export async function POST(request: NextRequest) {
             jmlAlpha,
             jmlHadir,
             jmlTdkHadir,
-            paraf
+            paraf,
+            tahunAjaran: bodyTahunAjaran,
+            semester: bodySemester,
         } = body
+
+        const parsedTanggal = parseToUTCMidnight(tanggal)
+        const autoDetected = determineTahunAjaranSemester(parsedTanggal)
+        const finalTahunAjaran = bodyTahunAjaran || defaultTahunAjaran || autoDetected.tahunAjaran
+        const finalSemester = bodySemester ? parseInt(bodySemester) : (defaultSemester || autoDetected.semester)
 
         const jurnal = await prisma.jurnal.create({
             data: {
-                tanggal: parseToUTCMidnight(tanggal),
+                tanggal: parsedTanggal,
                 jamKe,
                 mapel,
                 materi,
@@ -113,6 +160,8 @@ export async function POST(request: NextRequest) {
                 jmlTdkHadir: jmlTdkHadir !== undefined ? Number(jmlTdkHadir) : 0,
                 paraf: paraf || null,
                 kelas: parseInt(kelas),
+                tahunAjaran: finalTahunAjaran,
+                semester: finalSemester,
             },
         })
 
