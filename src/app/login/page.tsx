@@ -38,8 +38,15 @@ export default function LoginPage() {
                 toast.error("Username atau password salah")
             } else {
                 toast.success("Berhasil masuk!")
-                router.push("/dashboard")
-                router.refresh()
+                let targetUrl = "/dashboard"
+                if (typeof window !== "undefined") {
+                    const params = new URLSearchParams(window.location.search)
+                    const cb = params.get("callbackUrl")
+                    if (cb && cb.startsWith("/")) {
+                        targetUrl = cb
+                    }
+                }
+                window.location.href = targetUrl
             }
         } catch {
             toast.error("Terjadi kesalahan, coba lagi")

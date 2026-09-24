@@ -2,20 +2,38 @@ import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 import { getToken } from "next-auth/jwt"
 
-// Robust Edge Middleware - 100% safe from 500 MIDDLEWARE_INVOCATION_FAILED on Vercel
+// Edge Middleware: 100% resilient across HTTP localhost & HTTPS Vercel production
 export async function middleware(request: NextRequest) {
     try {
         const { pathname } = request.nextUrl
-
-        // Fallback secret guarantees getToken will NEVER throw [NO_SECRET] error on Vercel
         const secret = process.env.NEXTAUTH_SECRET || "SDN2Nangerang2025SecretKey123!"
 
-        const token = await getToken({
+        // Dual cookie resolution:
+        // Try secureCookie: true first (for production HTTPS e.g. __Secure-next-auth.session-token),
+        // then fallback to false (for localhost HTTP e.g. next-auth.session-token)
+        let token = await getToken({
             req: request,
             secret,
+            secureCookie: true,
         })
 
-        // 1. Dashboard pages: if not authenticated, redirect to /login
+        if (!token) {
+            token = await getToken({
+                req: request,
+                secret,
+                secureCookie: false,
+            })
+        }
+
+        // 1. If user is at /login and already logged in -> redirect to /dashboard
+        if (pathname === "/login") {
+            if (token) {
+                return NextResponse.redirect(new URL("/dashboard", request.url))
+            }
+            return NextResponse.next()
+        }
+
+        // 2. Dashboard pages: if not authenticated -> redirect to /login
         if (pathname.startsWith("/dashboard")) {
             if (!token) {
                 const loginUrl = new URL("/login", request.url)
@@ -24,7 +42,7 @@ export async function middleware(request: NextRequest) {
             }
         }
 
-        // 2. Protected API routes: if not authenticated, return 401 JSON
+        // 3. Protected API routes: if not authenticated -> return 401 JSON
         if (pathname.startsWith("/api/")) {
             if (!token) {
                 return NextResponse.json(
@@ -36,19 +54,16 @@ export async function middleware(request: NextRequest) {
 
         return NextResponse.next()
     } catch (error) {
-        console.error("Middleware execution caught error:", error)
-        // CRITICAL FOR VERCEL:
-        // Never allow an uncaught exception to bubble up into 500 MIDDLEWARE_INVOCATION_FAILED.
-        // Fall back to NextResponse.next() so the server-side getServerSession() handles auth safely.
+        console.error("Middleware Edge Error:", error)
+        // Never break the request with a 500 error; let page/API handle auth
         return NextResponse.next()
     }
 }
 
 export const config = {
     matcher: [
-        // Protect all dashboard pages
+        "/login",
         "/dashboard/:path*",
-        // Protect specific API route groups
         "/api/absensi/:path*",
         "/api/absensi-guru/:path*",
         "/api/activity-log/:path*",
