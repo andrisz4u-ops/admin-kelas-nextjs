@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
-import { prisma } from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
+import { kalenderService } from "@/services/kalenderService"
 
 export const dynamic = "force-dynamic"
 
-// POST /api/kalender/config - Upsert semester range config for academic year (Admin only)
+// POST /api/kalender/config - Upsert semester range config (Admin only)
 export async function POST(request: NextRequest) {
     try {
         const session = await getServerSession(authOptions)
@@ -29,21 +29,12 @@ export async function POST(request: NextRequest) {
             )
         }
 
-        const config = await prisma.kalenderConfig.upsert({
-            where: { tahunAjaran },
-            update: {
-                semester1Mulai: new Date(semester1Mulai),
-                semester1Selesai: new Date(semester1Selesai),
-                semester2Mulai: new Date(semester2Mulai),
-                semester2Selesai: new Date(semester2Selesai),
-            },
-            create: {
-                tahunAjaran,
-                semester1Mulai: new Date(semester1Mulai),
-                semester1Selesai: new Date(semester1Selesai),
-                semester2Mulai: new Date(semester2Mulai),
-                semester2Selesai: new Date(semester2Selesai),
-            },
+        const config = await kalenderService.upsertConfig({
+            tahunAjaran,
+            semester1Mulai,
+            semester1Selesai,
+            semester2Mulai,
+            semester2Selesai,
         })
 
         return NextResponse.json(config)

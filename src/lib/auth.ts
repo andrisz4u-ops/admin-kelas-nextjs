@@ -2,6 +2,7 @@ import type { NextAuthOptions } from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
 import { prisma } from "./prisma"
 import bcrypt from "bcryptjs"
+import { rateLimit } from "./rateLimit"
 
 export const authOptions: NextAuthOptions = {
     providers: [
@@ -16,6 +17,26 @@ export const authOptions: NextAuthOptions = {
                     return null
                 }
 
+                // Capture IP address
+                let ip = "unknown"
+                if (req?.headers) {
+                    const headers = req.headers as any
+                    ip = headers.get?.("x-forwarded-for") ||
+                        headers["x-forwarded-for"] ||
+                        headers.get?.("x-real-ip") ||
+                        headers["x-real-ip"] ||
+                        "unknown"
+
+                    if (ip.includes(",")) {
+                        ip = ip.split(",")[0].trim()
+                    }
+                }
+
+                const limiter = rateLimit(`login:${ip}:${credentials.username}`, { intervalMs: 60 * 1000, maxRequests: 10 })
+                if (!limiter.success) {
+                    throw new Error("Terlalu banyak percobaan login. Silakan coba lagi dalam 1 menit.")
+                }
+
                 const user = await prisma.user.findUnique({
                     where: { username: credentials.username }
                 })
@@ -28,24 +49,6 @@ export const authOptions: NextAuthOptions = {
 
                 if (!isValid) {
                     return null
-                }
-
-                // Capture IP address
-                let ip = "unknown"
-                if (req?.headers) {
-                    // Handle different header formats (Entries or generic object)
-                    const headers = req.headers as any
-                    // Try standard headers
-                    ip = headers.get?.("x-forwarded-for") ||
-                        headers["x-forwarded-for"] ||
-                        headers.get?.("x-real-ip") ||
-                        headers["x-real-ip"] ||
-                        "unknown"
-
-                    // Handle comma separated IPs (take first)
-                    if (ip.includes(",")) {
-                        ip = ip.split(",")[0].trim()
-                    }
                 }
 
                 return {

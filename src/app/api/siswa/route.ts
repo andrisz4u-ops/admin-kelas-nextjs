@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
-import { prisma } from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
+import { siswaService } from "@/services/siswaService"
 
 // GET all students for a class
 export async function GET(request: NextRequest) {
@@ -14,28 +14,18 @@ export async function GET(request: NextRequest) {
         const { searchParams } = new URL(request.url)
         const kelasParam = searchParams.get("kelas")
         const statusParam = searchParams.get("status") || "aktif" // default: hanya aktif
-        const tahunLulusParam = searchParams.get("tahunLulus")
+        const tahunLulusParam = searchParams.get("tahunLulus") || undefined
+        const search = searchParams.get("search") || undefined
+        const page = searchParams.get("page") ? parseInt(searchParams.get("page")!) : undefined
+        const limit = searchParams.get("limit") ? parseInt(searchParams.get("limit")!) : undefined
 
-        const whereClause: any = {}
-        // If searching specifically for alumni, don't restrict to kelas 1-6 unless explicitly passed
-        if (kelasParam && statusParam !== "alumni") {
-            whereClause.kelas = parseInt(kelasParam)
-        } else if (kelasParam && statusParam === "alumni") {
-            whereClause.kelas = parseInt(kelasParam)
-        }
-
-        // Filter by status: "aktif", "alumni", or "all"
-        if (statusParam !== "all") {
-            whereClause.status = statusParam
-        }
-
-        if (tahunLulusParam && tahunLulusParam !== "all") {
-            whereClause.tahunLulus = tahunLulusParam
-        }
-
-        const siswa = await prisma.siswa.findMany({
-            where: whereClause,
-            orderBy: [{ nama: "asc" }],
+        const siswa = await siswaService.getSiswaList({
+            kelas: kelasParam ? parseInt(kelasParam) : undefined,
+            status: statusParam,
+            tahunLulus: tahunLulusParam,
+            search,
+            page,
+            limit,
         })
 
         return NextResponse.json(siswa)
@@ -64,29 +54,22 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: "NIS dan Nama wajib diisi" }, { status: 400 })
         }
 
-        // Check if NIS already exists
-        const existing = await prisma.siswa.findUnique({ where: { nis } })
-        if (existing) {
-            return NextResponse.json({ error: "NIS sudah terdaftar" }, { status: 400 })
-        }
-
-        const parsedKelas = parseInt(kelas) || 1
-        const siswa = await prisma.siswa.create({
-            data: {
-                nis: String(nis).trim(),
-                nama: String(nama).trim(),
-                jenisKelamin: String(jenisKelamin || "L").toUpperCase(),
-                kelas: parsedKelas,
-                alamat: alamat || null,
-                namaOrtu: namaOrtu || null,
-                noHp: noHp || null,
-                status: "aktif"
-            },
+        const siswa = await siswaService.createSiswa({
+            nis,
+            nama,
+            jenisKelamin,
+            kelas: parseInt(kelas) || 1,
+            alamat,
+            namaOrtu,
+            noHp,
         })
 
         return NextResponse.json(siswa, { status: 201 })
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error creating siswa:", error)
+        if (error.message === "NIS sudah terdaftar") {
+            return NextResponse.json({ error: error.message }, { status: 400 })
+        }
         return NextResponse.json({ error: "Internal server error" }, { status: 500 })
     }
 }

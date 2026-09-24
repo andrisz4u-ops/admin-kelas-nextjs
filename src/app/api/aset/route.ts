@@ -3,15 +3,60 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 
-// GET - List all aset (all roles)
-export async function GET() {
+// GET - List aset with optional search & pagination
+export async function GET(request: Request) {
     try {
         const session = await getServerSession(authOptions)
         if (!session) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
         }
 
+        const { searchParams } = new URL(request.url)
+        const q = searchParams.get("q") || searchParams.get("search") || undefined
+        const kategori = searchParams.get("kategori") || undefined
+        const kib = searchParams.get("kib") || undefined
+        const kondisi = searchParams.get("kondisi") || undefined
+        const pageParam = searchParams.get("page")
+        const limitParam = searchParams.get("limit")
+
+        const where: any = {}
+        if (kategori && kategori !== "all") where.kategori = kategori
+        if (kib && kib !== "all") where.kib = kib
+        if (kondisi && kondisi !== "all") where.kondisi = kondisi
+        if (q) {
+            where.OR = [
+                { namaAset: { contains: q, mode: "insensitive" } },
+                { lokasi: { contains: q, mode: "insensitive" } },
+                { keterangan: { contains: q, mode: "insensitive" } },
+            ]
+        }
+
+        if (pageParam || limitParam) {
+            const page = Math.max(1, parseInt(pageParam || "1"))
+            const limit = Math.max(1, parseInt(limitParam || "20"))
+            const skip = (page - 1) * limit
+
+            const [total, data] = await Promise.all([
+                prisma.aset.count({ where }),
+                prisma.aset.findMany({
+                    where,
+                    orderBy: { namaAset: "asc" },
+                    skip,
+                    take: limit,
+                }),
+            ])
+
+            return NextResponse.json({
+                data,
+                total,
+                page,
+                limit,
+                totalPages: Math.ceil(total / limit),
+            })
+        }
+
         const aset = await prisma.aset.findMany({
+            where,
             orderBy: { namaAset: "asc" }
         })
 

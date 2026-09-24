@@ -16,10 +16,14 @@ export async function GET(request: NextRequest) {
         const page = parseInt(searchParams.get("page") || "1")
         const userId = searchParams.get("userId")
         const action = searchParams.get("action")
+        const search = searchParams.get("search") || searchParams.get("q")
 
         const where: any = {}
         if (userId) where.userId = userId
         if (action) where.action = action
+        if (search) {
+            where.details = { contains: search, mode: "insensitive" }
+        }
 
         const [logs, total] = await Promise.all([
             prisma.activityLog.findMany({

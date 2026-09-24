@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
-import { prisma } from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
+import { kalenderService } from "@/services/kalenderService"
 
 export const dynamic = "force-dynamic"
 
@@ -30,75 +30,22 @@ export async function POST(request: NextRequest) {
             )
         }
 
-        // Fetch source config and events
-        const [sourceConfig, sourceEvents] = await Promise.all([
-            prisma.kalenderConfig.findUnique({
-                where: { tahunAjaran: sourceTahunAjaran },
-            }),
-            prisma.kalenderEvent.findMany({
-                where: { tahunAjaran: sourceTahunAjaran },
-            }),
-        ])
-
-        if (!sourceConfig && sourceEvents.length === 0) {
-            return NextResponse.json(
-                { error: `Tidak ada data kalender ditemukan untuk tahun ajaran ${sourceTahunAjaran}` },
-                { status: 404 }
-            )
-        }
-
-        // Helper: shift date by shiftYears
-        const shiftDate = (d: Date): Date => {
-            const copy = new Date(d)
-            copy.setFullYear(copy.getFullYear() + shiftYears)
-            return copy
-        }
-
-        // Copy config if present
-        if (sourceConfig) {
-            await prisma.kalenderConfig.upsert({
-                where: { tahunAjaran: targetTahunAjaran },
-                update: {
-                    semester1Mulai: shiftDate(sourceConfig.semester1Mulai),
-                    semester1Selesai: shiftDate(sourceConfig.semester1Selesai),
-                    semester2Mulai: shiftDate(sourceConfig.semester2Mulai),
-                    semester2Selesai: shiftDate(sourceConfig.semester2Selesai),
-                },
-                create: {
-                    tahunAjaran: targetTahunAjaran,
-                    semester1Mulai: shiftDate(sourceConfig.semester1Mulai),
-                    semester1Selesai: shiftDate(sourceConfig.semester1Selesai),
-                    semester2Mulai: shiftDate(sourceConfig.semester2Mulai),
-                    semester2Selesai: shiftDate(sourceConfig.semester2Selesai),
-                },
-            })
-        }
-
-        // Copy events
-        let copiedCount = 0
-        for (const ev of sourceEvents) {
-            await prisma.kalenderEvent.create({
-                data: {
-                    tahunAjaran: targetTahunAjaran,
-                    judul: ev.judul,
-                    tanggalMulai: shiftDate(ev.tanggalMulai),
-                    tanggalSelesai: ev.tanggalSelesai ? shiftDate(ev.tanggalSelesai) : null,
-                    tipe: ev.tipe,
-                    isLibur: ev.isLibur,
-                    semester: ev.semester,
-                    deskripsi: ev.deskripsi,
-                },
-            })
-            copiedCount++
-        }
+        const result = await kalenderService.copyKalenderToNewYear(
+            sourceTahunAjaran,
+            targetTahunAjaran,
+            shiftYears
+        )
 
         return NextResponse.json({
             success: true,
-            message: `Berhasil menyalin kalender dari ${sourceTahunAjaran} ke ${targetTahunAjaran} (${copiedCount} agenda)`,
-            copiedCount,
+            message: result.message,
+            copiedCount: result.copiedCount,
         })
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error copying kalender:", error)
-        return NextResponse.json({ error: "Gagal menduplikasi kalender akademik" }, { status: 500 })
+        return NextResponse.json(
+            { error: error.message || "Gagal menduplikasi kalender akademik" },
+            { status: 500 }
+        )
     }
 }

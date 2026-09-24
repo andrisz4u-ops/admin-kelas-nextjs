@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
+import { rateLimit, getClientIp } from "@/lib/rateLimit"
 
 // GET database statistics and info
 export async function GET() {
@@ -70,6 +71,15 @@ export async function POST(request: NextRequest) {
         const session = await getServerSession(authOptions)
         if (!session || session.user.role !== "admin") {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+        }
+
+        const ip = getClientIp(request)
+        const limiter = rateLimit(`db-maintenance:${ip}`, { intervalMs: 60 * 1000, maxRequests: 10 })
+        if (!limiter.success) {
+            return NextResponse.json({
+                error: "Terlalu banyak permintaan maintenance database. Silakan tunggu 1 menit.",
+                reset: limiter.reset
+            }, { status: 429 })
         }
 
         const { action, options } = await request.json()

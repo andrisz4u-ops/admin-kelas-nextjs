@@ -3,15 +3,59 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 
-// GET - List all buku (all roles)
-export async function GET() {
+// GET - List buku with optional search & pagination
+export async function GET(request: Request) {
     try {
         const session = await getServerSession(authOptions)
         if (!session) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
         }
 
+        const { searchParams } = new URL(request.url)
+        const q = searchParams.get("q") || searchParams.get("search") || undefined
+        const kategori = searchParams.get("kategori") || undefined
+        const kelas = searchParams.get("kelas") ? parseInt(searchParams.get("kelas")!) : undefined
+        const pageParam = searchParams.get("page")
+        const limitParam = searchParams.get("limit")
+
+        const where: any = {}
+        if (kategori && kategori !== "all") where.kategori = kategori
+        if (kelas) where.kelas = kelas
+        if (q) {
+            where.OR = [
+                { judul: { contains: q, mode: "insensitive" } },
+                { penulis: { contains: q, mode: "insensitive" } },
+                { penerbit: { contains: q, mode: "insensitive" } },
+                { isbn: { contains: q, mode: "insensitive" } },
+            ]
+        }
+
+        if (pageParam || limitParam) {
+            const page = Math.max(1, parseInt(pageParam || "1"))
+            const limit = Math.max(1, parseInt(limitParam || "20"))
+            const skip = (page - 1) * limit
+
+            const [total, data] = await Promise.all([
+                prisma.buku.count({ where }),
+                prisma.buku.findMany({
+                    where,
+                    orderBy: { judul: "asc" },
+                    skip,
+                    take: limit,
+                }),
+            ])
+
+            return NextResponse.json({
+                data,
+                total,
+                page,
+                limit,
+                totalPages: Math.ceil(total / limit),
+            })
+        }
+
         const buku = await prisma.buku.findMany({
+            where,
             orderBy: { judul: "asc" }
         })
 

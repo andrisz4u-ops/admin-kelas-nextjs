@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
-import { prisma } from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
+import { kalenderService } from "@/services/kalenderService"
 
 export const dynamic = "force-dynamic"
 
@@ -24,24 +24,14 @@ export async function PUT(
             return NextResponse.json({ error: "Judul dan tanggalMulai wajib diisi" }, { status: 400 })
         }
 
-        const startDate = new Date(tanggalMulai)
-        const endDate = tanggalSelesai ? new Date(tanggalSelesai) : null
-
-        if (endDate && endDate < startDate) {
-            return NextResponse.json({ error: "Tanggal selesai tidak boleh sebelum tanggal mulai" }, { status: 400 })
-        }
-
-        const updated = await prisma.kalenderEvent.update({
-            where: { id },
-            data: {
-                judul,
-                tanggalMulai: startDate,
-                tanggalSelesai: endDate,
-                tipe: tipe || "event",
-                isLibur: isLibur !== undefined ? Boolean(isLibur) : tipe === "holiday",
-                semester: semester ? Number(semester) : null,
-                deskripsi: deskripsi || null,
-            },
+        const updated = await kalenderService.updateEvent(id, {
+            judul,
+            tanggalMulai,
+            tanggalSelesai,
+            tipe,
+            isLibur,
+            semester,
+            deskripsi,
         })
 
         return NextResponse.json(updated)
@@ -63,9 +53,7 @@ export async function DELETE(
         }
 
         const { id } = params
-        await prisma.kalenderEvent.delete({
-            where: { id },
-        })
+        await kalenderService.deleteEvent(id)
 
         return NextResponse.json({ success: true, message: "Agenda berhasil dihapus" })
     } catch (error) {

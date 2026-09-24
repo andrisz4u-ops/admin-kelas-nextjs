@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
-import { prisma } from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
+import { nilaiService } from "@/services/nilaiService"
 
 export const dynamic = "force-dynamic"
 
@@ -14,38 +14,18 @@ export async function GET(request: NextRequest) {
         }
 
         const { searchParams } = new URL(request.url)
-        const siswaId = searchParams.get("siswaId")
+        const siswaId = searchParams.get("siswaId") || undefined
         const kelas = searchParams.get("kelas") ? parseInt(searchParams.get("kelas")!) : undefined
         const tahunAjaran = searchParams.get("tahunAjaran") || undefined
         const mapel = searchParams.get("mapel") || undefined
-        const limit = Math.min(100, parseInt(searchParams.get("limit") || "50"))
+        const limit = searchParams.get("limit") ? parseInt(searchParams.get("limit")!) : 50
 
-        const where: any = {}
-        if (siswaId) where.siswaId = siswaId
-        if (kelas) where.kelas = kelas
-        if (tahunAjaran) where.tahunAjaran = tahunAjaran
-        if (mapel) where.mapel = mapel
-
-        const logs = await prisma.nilaiAuditLog.findMany({
-            where,
-            orderBy: { createdAt: "desc" },
-            take: limit,
-            include: {
-                user: {
-                    select: {
-                        id: true,
-                        name: true,
-                        role: true,
-                    },
-                },
-                siswa: {
-                    select: {
-                        id: true,
-                        nama: true,
-                        nis: true,
-                    },
-                },
-            },
+        const logs = await nilaiService.getAuditLogs({
+            siswaId,
+            kelas,
+            tahunAjaran,
+            mapel,
+            limit,
         })
 
         return NextResponse.json(logs)

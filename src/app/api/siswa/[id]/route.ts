@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
-import { prisma } from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
+import { siswaService } from "@/services/siswaService"
 
 export const dynamic = 'force-dynamic'
 
@@ -17,7 +17,7 @@ export async function GET(
         }
 
         const { id } = await params
-        const siswa = await prisma.siswa.findUnique({ where: { id } })
+        const siswa = await siswaService.getSiswaById(id)
 
         if (!siswa) {
             return NextResponse.json({ error: "Siswa tidak ditemukan" }, { status: 404 })
@@ -42,56 +42,27 @@ export async function PUT(
         }
 
         const { id } = await params
-        const existingStudent = await prisma.siswa.findUnique({ where: { id } })
-        if (!existingStudent) {
-            return NextResponse.json({ error: "Siswa tidak ditemukan" }, { status: 404 })
-        }
-
-        const userRole = session.user.role
-        const userKelas = session.user.kelas
-
-        // Hak akses: Admin bebas mengedit; Wali kelas hanya boleh mengedit siswa di kelasnya sendiri
-        if (userRole !== "admin") {
-            const isOwnStudent = userRole === "guru" && userKelas && existingStudent.kelas === userKelas
-            if (!isOwnStudent) {
-                return NextResponse.json({
-                    error: "Akses ditolak. Anda hanya berhak mengedit data siswa di kelas yang Anda ampu."
-                }, { status: 403 })
-            }
-        }
-
         const body = await request.json()
-        const { nis, nama, jenisKelamin, alamat, namaOrtu, noHp } = body
 
-        // Wali kelas tidak diizinkan mengubah NIS (kunci unik siswa)
-        const updateData: any = {
-            nama: nama !== undefined ? String(nama).trim() : existingStudent.nama,
-            jenisKelamin: jenisKelamin !== undefined ? String(jenisKelamin).toUpperCase() : existingStudent.jenisKelamin,
-            alamat: alamat !== undefined ? alamat : existingStudent.alamat,
-            namaOrtu: namaOrtu !== undefined ? namaOrtu : existingStudent.namaOrtu,
-            noHp: noHp !== undefined ? noHp : existingStudent.noHp,
-        }
-
-        // Hanya admin yang diizinkan mengubah NIS
-        if (userRole === "admin" && nis) {
-            const cleanNis = String(nis).trim()
-            if (cleanNis !== existingStudent.nis) {
-                const duplicateNis = await prisma.siswa.findUnique({ where: { nis: cleanNis } })
-                if (duplicateNis) {
-                    return NextResponse.json({ error: "NIS sudah digunakan oleh siswa lain" }, { status: 400 })
-                }
-                updateData.nis = cleanNis
-            }
-        }
-
-        const siswa = await prisma.siswa.update({
-            where: { id },
-            data: updateData,
-        })
+        const siswa = await siswaService.updateSiswa(
+            id,
+            body,
+            session.user.role,
+            session.user.kelas
+        )
 
         return NextResponse.json(siswa)
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error updating siswa:", error)
+        if (error.message === "Siswa tidak ditemukan") {
+            return NextResponse.json({ error: error.message }, { status: 404 })
+        }
+        if (error.message.includes("Akses ditolak")) {
+            return NextResponse.json({ error: error.message }, { status: 403 })
+        }
+        if (error.message.includes("sudah digunakan")) {
+            return NextResponse.json({ error: error.message }, { status: 400 })
+        }
         return NextResponse.json({ error: "Internal server error" }, { status: 500 })
     }
 }
@@ -112,7 +83,7 @@ export async function DELETE(
         }
 
         const { id } = await params
-        await prisma.siswa.delete({ where: { id } })
+        await siswaService.deleteSiswa(id)
 
         return NextResponse.json({ message: "Siswa berhasil dihapus" })
     } catch (error) {
