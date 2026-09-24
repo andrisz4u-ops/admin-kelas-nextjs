@@ -72,15 +72,20 @@ model Absensi {
 
 // Grades
 model Nilai {
-  id         String @id @default(cuid())
-  siswaId    String
-  siswa      Siswa  @relation(fields: [siswaId], references: [id], onDelete: Cascade)
-  mapel      String
-  jenisNilai String // UH1, UH2, UH3, UTS, UAS
-  nilai      Float
-  semester   Int    @default(1)
+  id          String   @id @default(cuid())
+  siswaId     String
+  siswa       Siswa    @relation(fields: [siswaId], references: [id], onDelete: Cascade)
+  kelas       Int      @default(1)
+  tahunAjaran String   @default("2025/2026")
+  mapel       String
+  jenisNilai  String   // UH1, UH2, UH3, UTS, UAS
+  nilai       Float
+  semester    Int      @default(1)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
 
-  @@unique([siswaId, mapel, jenisNilai, semester])
+  @@unique([siswaId, kelas, tahunAjaran, mapel, jenisNilai, semester])
+  @@index([siswaId, kelas, tahunAjaran])
 }
 
 // Daily journal

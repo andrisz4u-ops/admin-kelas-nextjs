@@ -192,7 +192,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 "/dashboard/pengaturan"
             ].includes(item.href)
         }
-        // Guru Mapel can see only limited menu: absensi, rekap-absensi, nilai, rekap-nilai, jadwal, kalender
+        // Guru Mapel can see: absensi, rekap-absensi, nilai, rekap-nilai, jurnal, jadwal, kalender
         if (isGuruMapel) {
             return [
                 "/dashboard",
@@ -200,6 +200,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 "/dashboard/rekap-absensi",
                 "/dashboard/nilai",
                 "/dashboard/rekap-nilai",
+                "/dashboard/jurnal",
                 "/dashboard/jadwal",
                 "/dashboard/kalender"
             ].includes(item.href)

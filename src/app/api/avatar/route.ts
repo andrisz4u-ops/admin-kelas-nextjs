@@ -18,7 +18,8 @@ export async function GET(request: NextRequest) {
         })
 
         if (!user || !user.fotoProfilUrl) {
-            return new NextResponse("Avatar not found", { status: 404 })
+            // Return 404 or default fallback avatar
+            return NextResponse.redirect(new URL("/logo-sekolah.png", request.url))
         }
 
         // If it's a Base64 data URL, parse and return binary image
@@ -37,12 +38,22 @@ export async function GET(request: NextRequest) {
             }
         }
 
-        // If it's an external URL (http:// or https://) or existing path, redirect
-        if (user.fotoProfilUrl.startsWith("http://") || user.fotoProfilUrl.startsWith("https://")) {
-            return NextResponse.redirect(user.fotoProfilUrl)
+        // If it's a local relative path (starts with /)
+        if (user.fotoProfilUrl.startsWith("/") && !user.fotoProfilUrl.startsWith("//")) {
+            return NextResponse.redirect(new URL(user.fotoProfilUrl, request.url))
         }
 
-        return NextResponse.redirect(new URL(user.fotoProfilUrl, request.url))
+        // If external URL, validate protocol
+        try {
+            const parsedUrl = new URL(user.fotoProfilUrl)
+            if (parsedUrl.protocol === "https:" || parsedUrl.protocol === "http:") {
+                return NextResponse.redirect(parsedUrl.toString())
+            }
+        } catch {
+            // Invalid URL format
+        }
+
+        return NextResponse.redirect(new URL("/logo-sekolah.png", request.url))
     } catch (error) {
         console.error("Error serving avatar:", error)
         return new NextResponse("Internal server error", { status: 500 })

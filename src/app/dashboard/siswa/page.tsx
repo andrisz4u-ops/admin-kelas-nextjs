@@ -21,6 +21,7 @@ interface Siswa {
 export default function SiswaPage() {
     const { data: session } = useSession()
     const isAdmin = session?.user?.role === "admin"
+    const isGuru = session?.user?.role === "guru"
     const isPengawas = session?.user?.role === "pengawas"
     const isKepsek = session?.user?.role === "kepsek"
     const canSelectKelas = isAdmin || isPengawas || isKepsek
@@ -39,6 +40,8 @@ export default function SiswaPage() {
     const [alumniTahunFilter, setAlumniTahunFilter] = useState("all") // Filter tahun lulus
     const [searchQuery, setSearchQuery] = useState("") // Search NIS / Nama
     const [availableTahunLulus, setAvailableTahunLulus] = useState<string[]>([])
+
+    const canEditSiswa = isAdmin || (isGuru && !showAlumni && kelas === userKelas)
 
     // Cek query param ?kelas= dan lock kelas untuk guru biasa
     useEffect(() => {
@@ -440,14 +443,14 @@ export default function SiswaPage() {
                                         <th className="px-4 py-3 font-medium text-[var(--accents-5)]">No. HP</th>
                                     </>
                                 )}
-                                {isAdmin && <th className="px-4 py-3 font-medium text-[var(--accents-5)] text-right">Aksi</th>}
+                                {canEditSiswa && <th className="px-4 py-3 font-medium text-[var(--accents-5)] text-right">Aksi</th>}
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-[var(--border)]">
                             {loading ? (
-                                <tr><td colSpan={isAdmin ? 8 : 6} className="px-4 py-12 text-center text-[var(--accents-5)]">Memuat data...</td></tr>
+                                <tr><td colSpan={canEditSiswa ? 8 : 7} className="px-4 py-12 text-center text-[var(--accents-5)]">Memuat data...</td></tr>
                             ) : displayedSiswa.length === 0 ? (
-                                <tr><td colSpan={isAdmin ? 8 : 6} className="px-4 py-12 text-center text-[var(--accents-5)]">
+                                <tr><td colSpan={canEditSiswa ? 8 : 7} className="px-4 py-12 text-center text-[var(--accents-5)]">
                                     {showAlumni ? "Belum ada data alumni untuk angkatan ini" : "Belum ada data siswa di kelas ini"}
                                 </td></tr>
                             ) : (
@@ -470,13 +473,25 @@ export default function SiswaPage() {
                                                 <td className="px-4 py-3 text-[var(--accents-5)] font-medium tabular-nums">{s.noHp || "-"}</td>
                                             </>
                                         )}
-                                        {isAdmin && (
+                                        {canEditSiswa && (
                                             <td className="px-4 py-3 text-right">
                                                 <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                                     {!showAlumni && (
-                                                        <button onClick={() => { setEditingSiswa(s); setShowModal(true) }} className="text-[var(--accents-5)] hover:text-black">Edit</button>
+                                                        <button
+                                                            onClick={() => { setEditingSiswa(s); setShowModal(true) }}
+                                                            className="text-blue-600 hover:text-blue-800 font-medium text-xs px-2 py-1 rounded hover:bg-blue-50 transition-colors"
+                                                        >
+                                                            Edit
+                                                        </button>
                                                     )}
-                                                    <button onClick={() => handleDelete(s.id)} className="text-red-500 hover:text-red-700">Hapus</button>
+                                                    {isAdmin && (
+                                                        <button
+                                                            onClick={() => handleDelete(s.id)}
+                                                            className="text-red-500 hover:text-red-700 font-medium text-xs px-2 py-1 rounded hover:bg-red-50 transition-colors"
+                                                        >
+                                                            Hapus
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </td>
                                         )}
@@ -488,11 +503,12 @@ export default function SiswaPage() {
                 </div>
             </div>
 
-            {/* Add/Edit Modal - hanya untuk admin */}
-            {showModal && isAdmin && (
+            {/* Add/Edit Modal - untuk admin & wali kelas */}
+            {showModal && (isAdmin || (isGuru && kelas === userKelas)) && (
                 <SiswaModal
                     siswa={editingSiswa}
                     kelas={kelas}
+                    isAdmin={isAdmin}
                     onClose={() => setShowModal(false)}
                     onSave={() => { setShowModal(false); fetchSiswa() }}
                 />
@@ -568,7 +584,7 @@ export default function SiswaPage() {
     )
 }
 
-function SiswaModal({ siswa, kelas, onClose, onSave }: { siswa: Siswa | null; kelas: number; onClose: () => void; onSave: () => void }) {
+function SiswaModal({ siswa, kelas, isAdmin, onClose, onSave }: { siswa: Siswa | null; kelas: number; isAdmin: boolean; onClose: () => void; onSave: () => void }) {
     const [form, setForm] = useState({
         nis: siswa?.nis || "",
         nama: siswa?.nama || "",
@@ -613,8 +629,17 @@ function SiswaModal({ siswa, kelas, onClose, onSave }: { siswa: Siswa | null; ke
                 </div>
                 <form onSubmit={handleSubmit} className="p-4 space-y-4">
                     <div>
-                        <label className="block text-xs font-medium text-[var(--accents-5)] mb-1">NIS</label>
-                        <input type="text" value={form.nis} onChange={(e) => setForm({ ...form, nis: e.target.value })} className="w-full px-3 py-2 bg-white border border-[var(--border)] rounded-md text-sm outline-none focus:ring-1 focus:ring-black" required />
+                        <label className="block text-xs font-medium text-[var(--accents-5)] mb-1">
+                            NIS {!isAdmin && <span className="text-gray-400 font-normal">(Terkunci untuk Wali Kelas)</span>}
+                        </label>
+                        <input
+                            type="text"
+                            value={form.nis}
+                            disabled={!isAdmin}
+                            onChange={(e) => setForm({ ...form, nis: e.target.value })}
+                            className="w-full px-3 py-2 bg-white border border-[var(--border)] rounded-md text-sm outline-none focus:ring-1 focus:ring-black disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
+                            required
+                        />
                     </div>
                     <div>
                         <label className="block text-xs font-medium text-[var(--accents-5)] mb-1">Nama Lengkap</label>

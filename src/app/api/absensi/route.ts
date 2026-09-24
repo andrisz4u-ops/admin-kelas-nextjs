@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
+import { parseToUTCMidnight } from "@/lib/dateUtils"
+
+export const dynamic = 'force-dynamic'
 
 // GET absensi for a class and date
 export async function GET(request: NextRequest) {
@@ -19,22 +22,15 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: "Tanggal required" }, { status: 400 })
         }
 
-        // Parse YYYY-MM-DD and create UTC date boundaries
-        // This ensures consistent querying regardless of server timezone
-        const [year, month, day] = tanggal.split('-').map(Number)
-
-        // Start of day: 00:00:00.000 Z
-        const queryDateStart = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0))
-
-        // End of day: 23:59:59.999 Z
-        const queryDateEnd = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999))
+        const queryDate = parseToUTCMidnight(tanggal)
+        const queryDateEnd = new Date(queryDate.getTime() + 24 * 60 * 60 * 1000 - 1)
 
         const absensi = await prisma.absensi.findMany({
             where: {
                 siswa: { kelas, status: "aktif" },
                 tanggal: {
-                    gte: queryDateStart,
-                    lte: queryDateEnd
+                    gte: queryDate,
+                    lte: queryDateEnd,
                 },
             },
             select: {
@@ -64,24 +60,40 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
         }
 
+        const userRole = session.user.role
+        const userKelas = session.user.kelas
+
+        // Kepsek & Pengawas bersifat Read-Only untuk absensi harian
+        if (userRole === "kepsek" || userRole === "pengawas") {
+            return NextResponse.json({ error: "Role Anda hanya memiliki izin baca (view-only)." }, { status: 403 })
+        }
+
         const body = await request.json()
         const entries = body.entries
         const kelasParam = body.kelas ? parseInt(body.kelas) : null
 
-        if (!Array.isArray(entries)) {
-            return NextResponse.json({ error: "Entries harus berupa array" }, { status: 400 })
+        if (!Array.isArray(entries) || entries.length === 0) {
+            return NextResponse.json({ error: "Entries harus berupa array yang tidak kosong" }, { status: 400 })
+        }
+
+        // Tentukan kelas sasaran
+        const targetKelas = kelasParam || userKelas
+
+        // Otorisasi BOLA: Guru wali kelas hanya boleh mengubah absensi kelasnya sendiri
+        if (userRole === "guru" && userKelas && targetKelas && targetKelas !== userKelas) {
+            return NextResponse.json({
+                error: `Akses ditolak. Sebagai wali kelas ${userKelas}, Anda tidak berhak mengubah absensi kelas ${targetKelas}.`
+            }, { status: 403 })
         }
 
         let targetDateNormalized: Date | null = null
 
-        for (const entry of entries) {
-            // Strict Date Parsing: YYYY-MM-DD -> UTC Midnight
-            const dateStr = new Date(entry.tanggal).toISOString().split('T')[0]
-            const [y, m, d] = dateStr.split('-').map(Number)
-            const dateNormalized = new Date(Date.UTC(y, m - 1, d, 0, 0, 0, 0))
+        // Siapkan batch operasi upsert
+        const upsertOps = entries.map((entry) => {
+            const dateNormalized = parseToUTCMidnight(entry.tanggal)
             if (!targetDateNormalized) targetDateNormalized = dateNormalized
 
-            await prisma.absensi.upsert({
+            return prisma.absensi.upsert({
                 where: {
                     siswaId_tanggal: {
                         siswaId: entry.siswaId,
@@ -95,14 +107,17 @@ export async function POST(request: NextRequest) {
                     status: entry.status,
                 },
             })
-        }
+        })
+
+        // Jalankan seluruh upsert dalam 1 transaksi batch (anti N+1 round-trips)
+        await prisma.$transaction(upsertOps)
 
         // Sinkronisasi otomatis ke Agenda Mengajar (Jurnal) untuk kelas & tanggal ini
-        if (targetDateNormalized && kelasParam) {
+        if (targetDateNormalized && targetKelas) {
             try {
                 const absentList = await prisma.absensi.findMany({
                     where: {
-                        siswa: { kelas: kelasParam, status: "aktif" },
+                        siswa: { kelas: targetKelas, status: "aktif" },
                         tanggal: targetDateNormalized,
                     },
                     include: {
@@ -118,7 +133,7 @@ export async function POST(request: NextRequest) {
                 const i = iNames.length
                 const a = aNames.length
                 const tdkHadir = s + i + a
-                const totalSiswa = await prisma.siswa.count({ where: { kelas: kelasParam, status: "aktif" } })
+                const totalSiswa = await prisma.siswa.count({ where: { kelas: targetKelas, status: "aktif" } })
                 const hadir = Math.max(0, totalSiswa - tdkHadir)
 
                 const parts: string[] = []
@@ -130,7 +145,7 @@ export async function POST(request: NextRequest) {
                 // Update semua jurnal pada kelas dan tanggal bersangkutan
                 await prisma.jurnal.updateMany({
                     where: {
-                        kelas: kelasParam,
+                        kelas: targetKelas,
                         tanggal: targetDateNormalized,
                     },
                     data: {
@@ -147,7 +162,7 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        return NextResponse.json({ message: "Absensi saved and synced to Jurnal" })
+        return NextResponse.json({ success: true, message: `${entries.length} data absensi berhasil disimpan dan disinkronkan ke Jurnal.` })
     } catch (error) {
         console.error("Error saving absensi:", error)
         return NextResponse.json({ error: "Internal server error" }, { status: 500 })

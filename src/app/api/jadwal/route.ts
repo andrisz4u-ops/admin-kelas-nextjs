@@ -9,12 +9,21 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const kelas = searchParams.get("kelas")
+    const mapel = searchParams.get("mapel")
 
-    if (!kelas) return NextResponse.json({ error: "Kelas is required" }, { status: 400 })
+    if (!kelas && !mapel) return NextResponse.json({ error: "Kelas or mapel is required" }, { status: 400 })
 
     try {
+        const whereClause: any = {}
+        if (kelas && kelas !== "ALL") {
+            whereClause.kelas = Number(kelas)
+        }
+        if (mapel) {
+            whereClause.mapel = { contains: mapel, mode: "insensitive" }
+        }
+
         const schedule = await prisma.jadwalPelajaran.findMany({
-            where: { kelas: Number(kelas) },
+            where: whereClause,
             orderBy: [{ hari: 'asc' }, { jamKe: 'asc' }]
         })
         return NextResponse.json(schedule)

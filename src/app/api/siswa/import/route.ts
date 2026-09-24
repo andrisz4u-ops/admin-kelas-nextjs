@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 
+export const dynamic = 'force-dynamic'
+
 // POST import multiple students
 export async function POST(request: NextRequest) {
     try {
@@ -21,34 +23,49 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: "No data to import" }, { status: 400 })
         }
 
-        // If replace, delete existing active students only (never delete alumni)
-        if (replace) {
-            if (allClasses) {
-                // Delete active students from classes 1-6
-                await prisma.siswa.deleteMany({
-                    where: { kelas: { in: [1, 2, 3, 4, 5, 6] }, status: "aktif" }
-                })
-            } else {
-                // Delete only active students from selected class
-                await prisma.siswa.deleteMany({ where: { kelas: parseInt(kelas), status: "aktif" } })
-            }
-        }
-
         // Prepare data - use each student's kelas if allClasses mode, otherwise use the kelas parameter
         const data = students.map((s: { nis: string; nama: string; jenisKelamin: string; kelas?: number; alamat?: string; namaOrtu?: string; noHp?: string }) => ({
-            nis: String(s.nis),
-            nama: String(s.nama),
+            nis: String(s.nis).trim(),
+            nama: String(s.nama).trim(),
             jenisKelamin: String(s.jenisKelamin || "L").toUpperCase(),
-            kelas: allClasses && s.kelas ? s.kelas : parseInt(kelas),
+            kelas: allClasses && s.kelas ? parseInt(String(s.kelas)) : parseInt(String(kelas)),
             alamat: s.alamat || null,
             namaOrtu: s.namaOrtu || null,
             noHp: s.noHp || null,
+            status: "aktif",
         }))
 
-        // Create many
-        const result = await prisma.siswa.createMany({
-            data,
-            skipDuplicates: true,
+        // Execute atomic transaction to prevent data loss on replace failure
+        const result = await prisma.$transaction(async (tx) => {
+            if (replace) {
+                if (allClasses) {
+                    await tx.siswa.deleteMany({
+                        where: { kelas: { in: [1, 2, 3, 4, 5, 6] }, status: "aktif" }
+                    })
+                } else {
+                    await tx.siswa.deleteMany({
+                        where: { kelas: parseInt(String(kelas)), status: "aktif" }
+                    })
+                }
+            }
+
+            const inserted = await tx.siswa.createMany({
+                data,
+                skipDuplicates: true,
+            })
+
+            // Log activity
+            if (session.user?.id) {
+                await tx.activityLog.create({
+                    data: {
+                        userId: session.user.id,
+                        action: "IMPORT_SISWA",
+                        details: `Mengimpor ${inserted.count} siswa ${allClasses ? 'ke semua kelas' : `ke kelas ${kelas}`}${replace ? ' (mode replace)' : ''}.`,
+                    }
+                })
+            }
+
+            return inserted
         })
 
         const message = allClasses

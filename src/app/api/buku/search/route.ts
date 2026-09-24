@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server"
 
+export const dynamic = 'force-dynamic'
+
 // Search books using Google Books API (no API key required for basic searches)
 export async function GET(request: Request) {
     try {

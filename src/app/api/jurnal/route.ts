@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
+import { parseToUTCMidnight } from "@/lib/dateUtils"
+
+export const dynamic = 'force-dynamic'
 
 // GET jurnal for a class
 export async function GET(request: NextRequest) {
@@ -53,7 +56,7 @@ export async function POST(request: NextRequest) {
                 body.map(item =>
                     prisma.jurnal.create({
                         data: {
-                            tanggal: new Date(item.tanggal),
+                            tanggal: parseToUTCMidnight(item.tanggal),
                             jamKe: item.jamKe,
                             mapel: item.mapel,
                             materi: item.materi || "Pembelajaran sesuai modul / silabus",
@@ -95,7 +98,7 @@ export async function POST(request: NextRequest) {
 
         const jurnal = await prisma.jurnal.create({
             data: {
-                tanggal: new Date(tanggal),
+                tanggal: parseToUTCMidnight(tanggal),
                 jamKe,
                 mapel,
                 materi,

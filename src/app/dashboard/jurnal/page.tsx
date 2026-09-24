@@ -217,12 +217,23 @@ export default function JurnalPage() {
     const [loading, setLoading] = useState(true)
     const [syncing, setSyncing] = useState(false)
 
-    // Selector: 1-6 untuk Wali Kelas, atau "PAI" untuk Guru Mapel PAI
+    // Guru Mapel setup & assigned subjects
+    const userMapels = useMemo(() => {
+        return session?.user?.mapelDiampu
+            ? session.user.mapelDiampu.split(",").map((m: string) => m.trim()).filter(Boolean)
+            : []
+    }, [session?.user?.mapelDiampu])
+    const defaultGuruMapel = userMapels[0] || "PAI"
+
+    // Selector: 1-6 untuk Wali Kelas, atau kode Mapel (misal "PAI" / "AKPK") untuk Guru Mapel
     const [selectedViewKey, setSelectedViewKey] = useState<string>(
-        isGuruMapel ? "PAI" : (userKelas ? String(userKelas) : "1")
+        isGuruMapel ? defaultGuruMapel : (userKelas ? String(userKelas) : "1")
     )
 
-    const isModePAI = selectedViewKey === "PAI"
+    const isModePAI = isGuruMapel || !["1", "2", "3", "4", "5", "6"].includes(selectedViewKey)
+    const activeMapel = isModePAI
+        ? (isGuruMapel ? (userMapels.includes(selectedViewKey) ? selectedViewKey : defaultGuruMapel) : selectedViewKey)
+        : null
     const currentKelas = isModePAI ? 5 : Number(selectedViewKey)
 
     const [showModal, setShowModal] = useState(false)
@@ -241,22 +252,31 @@ export default function JurnalPage() {
     const [waliKelasList, setWaliKelasList] = useState<WaliKelasInfo[]>([])
 
     // Subjects for current class
-    const mapelList = getMapelByKelas(currentKelas)
+    const mapelList = isModePAI && activeMapel ? [activeMapel] : getMapelByKelas(currentKelas)
 
     // Cek query param ?kelas= dan lock kelas untuk wali kelas biasa
     useEffect(() => {
         if (typeof window !== "undefined") {
             const params = new URLSearchParams(window.location.search)
             const qKelas = params.get("kelas")
-            if (qKelas && ([1, 2, 3, 4, 5, 6].includes(Number(qKelas)) || qKelas === "PAI")) {
-                setSelectedViewKey(String(qKelas))
-                return
+            if (qKelas) {
+                if ([1, 2, 3, 4, 5, 6].includes(Number(qKelas))) {
+                    if (!isGuruMapel) {
+                        setSelectedViewKey(String(qKelas))
+                        return
+                    }
+                } else if (qKelas === "PAI" || qKelas === "AKPK" || userMapels.includes(qKelas)) {
+                    setSelectedViewKey(String(qKelas))
+                    return
+                }
             }
         }
-        if (!canSelectKelas && userKelas) {
+        if (isGuruMapel) {
+            setSelectedViewKey(prev => userMapels.includes(prev) ? prev : defaultGuruMapel)
+        } else if (!canSelectKelas && userKelas) {
             setSelectedViewKey(String(userKelas))
         }
-    }, [canSelectKelas, userKelas])
+    }, [canSelectKelas, userKelas, isGuruMapel, defaultGuruMapel, userMapels])
 
     // Load school settings, wali kelas
     useEffect(() => {
@@ -289,8 +309,8 @@ export default function JurnalPage() {
     const fetchJurnal = useCallback(async () => {
         try {
             setLoading(true)
-            const url = isModePAI
-                ? `/api/jurnal?kelas=ALL&mapel=PAI`
+            const url = isModePAI && activeMapel
+                ? `/api/jurnal?kelas=ALL&mapel=${encodeURIComponent(activeMapel)}`
                 : `/api/jurnal?kelas=${currentKelas}`
             const res = await fetch(url)
             const data = await res.json()
@@ -304,13 +324,13 @@ export default function JurnalPage() {
         } finally {
             setLoading(false)
         }
-    }, [currentKelas, isModePAI])
+    }, [currentKelas, isModePAI, activeMapel])
 
     // Fetch Schedule
     const fetchSchedule = useCallback(async () => {
         try {
-            const url = isModePAI
-                ? `/api/jadwal?mapel=PAI`
+            const url = isModePAI && activeMapel
+                ? `/api/jadwal?mapel=${encodeURIComponent(activeMapel)}`
                 : `/api/jadwal?kelas=${currentKelas}`
             const res = await fetch(url)
             if (res.ok) {
@@ -320,7 +340,7 @@ export default function JurnalPage() {
                 }
             }
         } catch { }
-    }, [currentKelas, isModePAI])
+    }, [currentKelas, isModePAI, activeMapel])
 
     useEffect(() => {
         fetchJurnal()
@@ -455,10 +475,12 @@ export default function JurnalPage() {
     // Current Teacher Display
     const currentWali = waliKelasList.find(w => w.kelas === currentKelas)
     const teacherName = isModePAI
-        ? "Kuraesin, S.Pd.I"
+        ? (isGuruMapel ? (session?.user?.name || "Guru Mata Pelajaran") : (activeMapel === "PAI" ? "Kuraesin, S.Pd.I" : (session?.user?.name || "Guru Mata Pelajaran")))
         : (currentWali?.nama || session?.user?.name || "Guru Kelas")
     const subjectDisplayName = isModePAI
-        ? "Pendidikan Agama Islam dan Budi Pekerti (PAIBP)"
+        ? (activeMapel === "PAI"
+            ? "Pendidikan Agama Islam dan Budi Pekerti (PAIBP)"
+            : (activeMapel === "AKPK" ? "Pendidikan Karakter (AKPK)" : `${activeMapel || "Mata Pelajaran"} (Lintas Kelas)`))
         : `Guru Kelas ${toRoman(currentKelas)} (Semua Mapel)`
 
     // Ringkasan Kehadiran Hari Ini
@@ -537,10 +559,24 @@ export default function JurnalPage() {
                                 onChange={(e) => setSelectedViewKey(e.target.value)}
                                 className="h-9 pl-3 pr-8 bg-white border border-[var(--border)] rounded-md text-sm font-semibold text-[var(--foreground)] outline-none focus:ring-1 focus:ring-black cursor-pointer appearance-none shadow-sm"
                             >
-                                {[1, 2, 3, 4, 5, 6].map((k) => (
+                                {!isGuruMapel && [1, 2, 3, 4, 5, 6].map((k) => (
                                     <option key={k} value={String(k)}>Kelas {toRoman(k)} ({k})</option>
                                 ))}
-                                <option value="PAI">🕌 Guru Mapel: PAI & BP (Lintas Kelas)</option>
+                                {!isGuruMapel && (
+                                    <>
+                                        <option value="PAI">🕌 Guru Mapel: PAI & BP (Lintas Kelas)</option>
+                                        <option value="AKPK">📘 Guru Mapel: AKPK (Lintas Kelas)</option>
+                                    </>
+                                )}
+                                {isGuruMapel && (
+                                    userMapels.length > 0 ? (
+                                        userMapels.map(m => (
+                                            <option key={m} value={m}>📖 Guru Mapel: {m} (Lintas Kelas)</option>
+                                        ))
+                                    ) : (
+                                        <option value={defaultGuruMapel}>📖 Guru Mapel: {defaultGuruMapel} (Lintas Kelas)</option>
+                                    )
+                                )}
                             </select>
                             <div className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-[var(--accents-5)]">
                                 <svg width="10" height="6" viewBox="0 0 10 6" fill="none"><path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
@@ -548,7 +584,7 @@ export default function JurnalPage() {
                         </div>
                     ) : (
                         <span className="h-9 px-3 flex items-center bg-[var(--accents-2)] border border-[var(--border)] rounded-md text-sm font-semibold text-[var(--foreground)]">
-                            Kelas {toRoman(currentKelas)}
+                            {isModePAI ? `Guru Mapel: ${activeMapel}` : `Kelas ${toRoman(currentKelas)}`}
                         </span>
                     )}
 
@@ -995,6 +1031,8 @@ export default function JurnalPage() {
                 <JurnalModal
                     jurnal={editingJurnal}
                     kelas={currentKelas}
+                    isModePAI={isModePAI}
+                    activeMapel={activeMapel}
                     mapelList={mapelList}
                     schedule={schedule}
                     totalSiswa={totalSiswa}
@@ -1024,6 +1062,8 @@ export default function JurnalPage() {
                     allJurnal={jurnal}
                     kelas={currentKelas}
                     isModePAI={isModePAI}
+                    activeMapel={activeMapel}
+                    subjectDisplayName={subjectDisplayName}
                     schoolSettings={schoolSettings}
                     waliKelas={currentWali}
                     initialDate={selectedDate}
@@ -1417,6 +1457,8 @@ function AutoFillScheduleModal({
 function JurnalModal({
     jurnal,
     kelas,
+    isModePAI,
+    activeMapel,
     mapelList,
     schedule,
     totalSiswa,
@@ -1426,6 +1468,8 @@ function JurnalModal({
 }: {
     jurnal: Jurnal | null
     kelas: number
+    isModePAI?: boolean
+    activeMapel?: string | null
     mapelList: string[]
     schedule: JadwalPelajaranItem[]
     totalSiswa: number
@@ -1433,10 +1477,11 @@ function JurnalModal({
     onClose: () => void
     onSave: () => void
 }) {
+    const [selectedEntryKelas, setSelectedEntryKelas] = useState<number>(jurnal?.kelas || (isModePAI ? 1 : kelas))
     const [form, setForm] = useState({
         tanggal: jurnal?.tanggal ? getItemYMD(jurnal.tanggal) : defaultDate || getTodayYMD(),
         jamKe: jurnal?.jamKe || "1-2",
-        mapel: jurnal?.mapel || mapelList[0] || "",
+        mapel: jurnal?.mapel || (isModePAI && activeMapel ? activeMapel : mapelList[0]) || "",
         materi: jurnal?.materi || "",
         jmlSakit: jurnal?.jmlSakit ?? 0,
         jmlIzin: jurnal?.jmlIzin ?? 0,
@@ -1456,15 +1501,16 @@ function JurnalModal({
         return DAY_NAMES_ID[dt.getDay()] || "Senin"
     }, [form.tanggal])
 
-    // Group schedule for this day
+    // Group schedule for this day and effective class
+    const effectiveKelas = isModePAI ? selectedEntryKelas : kelas
     const daySchedule = useMemo(() => {
-        return groupScheduleForDay(schedule, dayName, kelas)
-    }, [schedule, dayName, kelas])
+        return groupScheduleForDay(schedule, dayName, effectiveKelas)
+    }, [schedule, dayName, effectiveKelas])
 
     // Fetch absensi siswa otomatis saat tanggal/kelas berubah jika belum ada jurnal
     useEffect(() => {
         if (!jurnal) {
-            fetch(`/api/absensi?kelas=${kelas}&tanggal=${form.tanggal}`)
+            fetch(`/api/absensi?kelas=${effectiveKelas}&tanggal=${form.tanggal}`)
                 .then(res => res.json())
                 .then(data => {
                     if (Array.isArray(data) && data.length > 0) {
@@ -1488,7 +1534,7 @@ function JurnalModal({
                 })
                 .catch(() => { })
         }
-    }, [kelas, form.tanggal, jurnal])
+    }, [effectiveKelas, form.tanggal, jurnal])
 
     const tdkHadir = (form.jmlSakit || 0) + (form.jmlIzin || 0) + (form.jmlAlpha || 0)
     const hadir = Math.max(0, totalSiswa - tdkHadir)
@@ -1508,7 +1554,7 @@ function JurnalModal({
 
             const payload = {
                 ...form,
-                kelas,
+                kelas: effectiveKelas,
                 metode: "-",
                 kategori: isAgenda ? "AGENDA" : "KBM",
                 jmlHadir: hadir,
@@ -1574,11 +1620,23 @@ function JurnalModal({
                         </div>
                         <div>
                             <label className="block text-xs font-semibold text-[var(--accents-6)] mb-1">
-                                Hari / Jadwal
+                                {isModePAI ? "Kelas Sasaran (Lintas Kelas)" : "Hari / Jadwal"}
                             </label>
-                            <div className="h-[38px] px-3 flex items-center bg-gray-100 rounded-md text-sm font-bold text-gray-800 border border-gray-200">
-                                {dayName}, Kelas {toRoman(kelas)}
-                            </div>
+                            {isModePAI ? (
+                                <select
+                                    value={selectedEntryKelas}
+                                    onChange={(e) => setSelectedEntryKelas(Number(e.target.value))}
+                                    className="w-full h-[38px] px-3 bg-white border border-[var(--border)] rounded-md text-sm font-semibold outline-none focus:ring-1 focus:ring-black"
+                                >
+                                    {[1, 2, 3, 4, 5, 6].map(k => (
+                                        <option key={k} value={k}>Kelas {toRoman(k)} ({dayName})</option>
+                                    ))}
+                                </select>
+                            ) : (
+                                <div className="h-[38px] px-3 flex items-center bg-gray-100 rounded-md text-sm font-bold text-gray-800 border border-gray-200">
+                                    {dayName}, Kelas {toRoman(kelas)}
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -1821,6 +1879,8 @@ function PrintPreviewModal({
     allJurnal,
     kelas,
     isModePAI,
+    activeMapel,
+    subjectDisplayName,
     schoolSettings,
     waliKelas,
     initialDate,
@@ -1830,6 +1890,8 @@ function PrintPreviewModal({
     allJurnal: Jurnal[]
     kelas: number
     isModePAI?: boolean
+    activeMapel?: string | null
+    subjectDisplayName?: string
     schoolSettings: SchoolSettings | null
     waliKelas?: WaliKelasInfo
     initialDate: string
@@ -1846,12 +1908,13 @@ function PrintPreviewModal({
         return d.getMonth().toString()
     })
 
+    const isGuruMapel = session?.user?.role === "guru_mapel"
     const teacherName = isModePAI
-        ? "Kuraesin, S.Pd.I"
+        ? (isGuruMapel ? (session?.user?.name || "Guru Mata Pelajaran") : (activeMapel === "PAI" ? "Kuraesin, S.Pd.I" : (session?.user?.name || "Guru Mata Pelajaran")))
         : (waliKelas?.nama || session?.user?.name || "Guru Kelas")
     const schoolName = schoolSettings?.namaSekolah || "SD Negeri 2 Nangerang"
     const subjectName = isModePAI
-        ? "Pendidikan Agama Islam dan Budi Pekerti (PAIBP)"
+        ? (subjectDisplayName || (activeMapel === "PAI" ? "Pendidikan Agama Islam dan Budi Pekerti (PAIBP)" : `${activeMapel || "Mata Pelajaran"} (Lintas Kelas)`))
         : `${getKelasWord(kelas)} (${toRoman(kelas)})`
 
     // Hitung tanggal terpilih
@@ -1958,6 +2021,7 @@ function PrintPreviewModal({
                     printMode,
                     kelas,
                     isModePAI,
+                    subjectName,
                     teacherName,
                     schoolName,
                     currentDate,
@@ -1977,9 +2041,10 @@ function PrintPreviewModal({
             const url = window.URL.createObjectURL(blob)
             const a = document.createElement("a")
             a.href = url
+            const fileSubject = isModePAI ? (activeMapel || "Mapel") : `Kelas_${kelas}`
             const fileName = printMode === "HARIAN"
-                ? `Agenda_Mengajar_${isModePAI ? "PAIBP" : `Kelas_${kelas}`}_${currentDate}.xlsx`
-                : `Agenda_Mengajar_${isModePAI ? "PAIBP" : `Kelas_${kelas}`}_${monthLabel}.xlsx`
+                ? `Agenda_Mengajar_${fileSubject}_${currentDate}.xlsx`
+                : `Agenda_Mengajar_${fileSubject}_${monthLabel}.xlsx`
             a.download = fileName
             document.body.appendChild(a)
             a.click()

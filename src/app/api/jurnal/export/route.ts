@@ -21,6 +21,7 @@ export async function POST(req: NextRequest) {
             printMode = "HARIAN",
             kelas = 5,
             isModePAI = false,
+            subjectName = "",
             teacherName = "Andris Hadiansyah, S.Pd",
             schoolName = "SDN 2 Nangerang",
             currentDate = "",
@@ -93,8 +94,8 @@ export async function POST(req: NextRequest) {
         ws.getCell(5, 1).value = `Nama Sekolah   : ${schoolName}`
         ws.getCell(5, 1).font = { name: "Arial", size: 10, bold: true }
 
-        if (isModePAI) {
-            ws.getCell(6, 1).value = "Mata Pelajaran : Pendidikan Agama Islam & Budi Pekerti (Lintas Kelas)"
+        if (isModePAI || subjectName) {
+            ws.getCell(6, 1).value = `Mata Pelajaran : ${subjectName || "Pendidikan Agama Islam & Budi Pekerti (Lintas Kelas)"}`
         } else {
             ws.getCell(6, 1).value = `Kelas          : ${getKelasWord(kelas)} (${toRoman(kelas)})`
         }

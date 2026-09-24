@@ -112,3 +112,6 @@ export async function GET() {
         return NextResponse.json({ error: "Gagal seeding", details: error }, { status: 500 })
     }
 }
+
+export { GET as POST }
+

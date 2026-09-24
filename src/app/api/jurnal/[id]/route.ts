@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 
+import { parseToUTCMidnight } from "@/lib/dateUtils"
+
 // PUT update jurnal
 export async function PUT(
     request: NextRequest,
@@ -36,7 +38,7 @@ export async function PUT(
         const jurnal = await prisma.jurnal.update({
             where: { id },
             data: {
-                tanggal: new Date(tanggal),
+                tanggal: parseToUTCMidnight(tanggal),
                 jamKe,
                 mapel,
                 materi,

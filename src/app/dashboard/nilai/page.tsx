@@ -116,15 +116,18 @@ export default function NilaiPage() {
         setSaving(true)
         try {
             const entries = Object.entries(nilai).filter(([, v]) => !isNaN(v)).map(([siswaId, nilaiValue]) => ({
-                siswaId, mapel, jenisNilai, nilai: nilaiValue, semester
+                siswaId, mapel, jenisNilai, nilai: nilaiValue, semester, kelas
             }))
             const res = await fetch("/api/nilai", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ entries, semester }),
+                body: JSON.stringify({ entries, semester, kelas }),
             })
             if (res.ok) toast.success("Nilai berhasil disimpan!")
-            else toast.error("Gagal menyimpan")
+            else {
+                const errData = await res.json().catch(() => null)
+                toast.error(errData?.error || "Gagal menyimpan")
+            }
         } catch { toast.error("Terjadi kesalahan") }
         finally { setSaving(false) }
     }

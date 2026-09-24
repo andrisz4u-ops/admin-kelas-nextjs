@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
+import { parseToUTCMidnight } from "@/lib/dateUtils"
+
+export const dynamic = 'force-dynamic'
 
 // GET teacher attendance by date
 export async function GET(request: NextRequest) {
@@ -16,10 +19,11 @@ export async function GET(request: NextRequest) {
         const bulan = searchParams.get("bulan") // Format: YYYY-MM
 
         if (tanggal) {
-            // Daily attendance
+            const dateObj = parseToUTCMidnight(tanggal)
+
             const attendance = await prisma.absensiGuru.findMany({
                 where: {
-                    tanggal: new Date(tanggal)
+                    tanggal: dateObj
                 }
             })
 
@@ -45,8 +49,8 @@ export async function GET(request: NextRequest) {
         if (bulan) {
             // Monthly recap
             const [year, month] = bulan.split("-").map(Number)
-            const startDate = new Date(year, month - 1, 1)
-            const endDate = new Date(year, month, 0)
+            const startDate = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0))
+            const endDate = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999))
 
             const attendance = await prisma.absensiGuru.findMany({
                 where: {
@@ -60,14 +64,14 @@ export async function GET(request: NextRequest) {
             return NextResponse.json(attendance)
         }
 
-        return NextResponse.json({ error: "Missing tanggal or bulan parameter" }, { status: 400 })
+        return NextResponse.json({ error: "Parameter tanggal atau bulan required" }, { status: 400 })
     } catch (error) {
         console.error("Error fetching teacher attendance:", error)
         return NextResponse.json({ error: "Internal server error" }, { status: 500 })
     }
 }
 
-// POST save/update teacher attendance
+// POST save teacher attendance
 export async function POST(request: NextRequest) {
     try {
         const session = await getServerSession(authOptions)
@@ -75,39 +79,42 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
         }
 
-        const { tanggal, attendance } = await request.json()
+        const body = await request.json()
+        const { tanggal, attendance } = body
 
-        if (!tanggal || !Array.isArray(attendance)) {
+        if (!tanggal || !Array.isArray(attendance) || attendance.length === 0) {
             return NextResponse.json({ error: "Invalid data" }, { status: 400 })
         }
 
-        const dateObj = new Date(tanggal)
+        const dateObj = parseToUTCMidnight(tanggal)
 
-        for (const att of attendance) {
-            const { userId, waktuDatang, ttdDatang, waktuPulang, ttdPulang } = att
-
-            await prisma.absensiGuru.upsert({
-                where: {
-                    userId_tanggal: { userId, tanggal: dateObj }
-                },
-                update: {
-                    waktuDatang: waktuDatang || null,
-                    ttdDatang: ttdDatang || null,
-                    waktuPulang: waktuPulang || null,
-                    ttdPulang: ttdPulang || null,
-                },
-                create: {
-                    userId,
-                    tanggal: dateObj,
-                    waktuDatang: waktuDatang || null,
-                    ttdDatang: ttdDatang || null,
-                    waktuPulang: waktuPulang || null,
-                    ttdPulang: ttdPulang || null,
-                }
+        // Batch execution with prisma.$transaction
+        await prisma.$transaction(
+            attendance.map((att: any) => {
+                const { userId, waktuDatang, ttdDatang, waktuPulang, ttdPulang } = att
+                return prisma.absensiGuru.upsert({
+                    where: {
+                        userId_tanggal: { userId, tanggal: dateObj }
+                    },
+                    update: {
+                        waktuDatang: waktuDatang || null,
+                        ttdDatang: ttdDatang || null,
+                        waktuPulang: waktuPulang || null,
+                        ttdPulang: ttdPulang || null,
+                    },
+                    create: {
+                        userId,
+                        tanggal: dateObj,
+                        waktuDatang: waktuDatang || null,
+                        ttdDatang: ttdDatang || null,
+                        waktuPulang: waktuPulang || null,
+                        ttdPulang: ttdPulang || null,
+                    }
+                })
             })
-        }
+        )
 
-        return NextResponse.json({ success: true })
+        return NextResponse.json({ success: true, count: attendance.length })
     } catch (error) {
         console.error("Error saving teacher attendance:", error)
         return NextResponse.json({ error: "Internal server error" }, { status: 500 })

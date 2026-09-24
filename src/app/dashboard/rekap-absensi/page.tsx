@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react"
 import { useSession } from "next-auth/react"
 import toast from "react-hot-toast"
 import * as XLSX from "xlsx-js-style"
+import { SelectKelas, Button, Badge } from "@/components/ui"
 
 interface RekapSiswa {
     id: string
@@ -525,24 +526,11 @@ export default function RekapAbsensiPage() {
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                     {/* Class selector */}
-                    {canSelectKelas ? (
-                        <div className="relative">
-                            <select
-                                value={kelas}
-                                onChange={(e) => setKelas(Number(e.target.value))}
-                                className="h-9 pl-3 pr-8 bg-white border border-[var(--border)] rounded-md text-sm text-[var(--foreground)] outline-none focus:ring-1 focus:ring-black cursor-pointer appearance-none"
-                            >
-                                {[1, 2, 3, 4, 5, 6].map((k) => (<option key={k} value={k}>Kelas {k}</option>))}
-                            </select>
-                            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[var(--accents-5)]">
-                                <svg width="10" height="6" viewBox="0 0 10 6" fill="none"><path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                            </div>
-                        </div>
-                    ) : (
-                        <span className="h-9 px-3 flex items-center bg-[var(--accents-2)] border border-[var(--border)] rounded-md text-sm font-medium text-[var(--foreground)]">
-                            Kelas {kelas}
-                        </span>
-                    )}
+                    <SelectKelas
+                        value={kelas}
+                        onChange={setKelas}
+                        disabled={!canSelectKelas}
+                    />
 
                     {/* Type selector */}
                     <div className="flex rounded-md border border-[var(--border)] overflow-hidden">
@@ -620,17 +608,21 @@ export default function RekapAbsensiPage() {
                     )}
 
                     {/* Export button */}
-                    <button
+                    <Button
                         onClick={handleExport}
-                        className="h-9 px-4 bg-emerald-600 text-white rounded-md text-sm font-medium hover:bg-emerald-700 transition-colors flex items-center gap-2"
+                        variant="secondary"
+                        size="sm"
+                        className="bg-emerald-600! text-white! hover:bg-emerald-700! border-emerald-600!"
+                        icon={
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                <polyline points="7 10 12 15 17 10" />
+                                <line x1="12" y1="15" x2="12" y2="3" />
+                            </svg>
+                        }
                     >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                            <polyline points="7 10 12 15 17 10" />
-                            <line x1="12" y1="15" x2="12" y2="3" />
-                        </svg>
                         Export Excel
-                    </button>
+                    </Button>
                 </div>
             </div>
 
@@ -709,12 +701,9 @@ export default function RekapAbsensiPage() {
                                         <td className="px-4 py-3 text-center font-bold text-blue-600 tabular-nums">{s.izin}</td>
                                         <td className="px-4 py-3 text-center font-bold text-red-600 tabular-nums">{s.alpha}</td>
                                         <td className="px-4 py-3 text-center">
-                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${s.percentage >= 90 ? "bg-emerald-100 text-emerald-800" :
-                                                s.percentage >= 75 ? "bg-amber-100 text-amber-800" :
-                                                    "bg-red-100 text-red-800"
-                                                }`}>
+                                            <Badge variant={s.percentage >= 90 ? "success" : s.percentage >= 75 ? "warning" : "danger"}>
                                                 {s.percentage}%
-                                            </span>
+                                            </Badge>
                                         </td>
                                     </tr>
                                 ))
