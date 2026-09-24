@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
             }
 
             case "export-backup": {
-                // Export all data as JSON backup
+                // Export all data as comprehensive JSON backup
                 const [
                     siswa,
                     absensi,
@@ -137,7 +137,13 @@ export async function POST(request: NextRequest) {
                     aset,
                     waliKelas,
                     schoolSettings,
-                    mapelKelas
+                    mapelKelas,
+                    kalenderConfig,
+                    kalenderEvent,
+                    riwayatKelas,
+                    jadwalPelajaran,
+                    nilaiAuditLog,
+                    users,
                 ] = await Promise.all([
                     prisma.siswa.findMany(),
                     prisma.absensi.findMany(),
@@ -147,12 +153,43 @@ export async function POST(request: NextRequest) {
                     prisma.aset.findMany(),
                     prisma.waliKelas.findMany(),
                     prisma.schoolSettings.findFirst(),
-                    prisma.mapelKelas.findMany()
+                    prisma.mapelKelas.findMany(),
+                    prisma.kalenderConfig.findMany(),
+                    prisma.kalenderEvent.findMany(),
+                    prisma.riwayatKelas.findMany(),
+                    prisma.jadwalPelajaran.findMany(),
+                    prisma.nilaiAuditLog.findMany(),
+                    prisma.user.findMany({
+                        select: {
+                            id: true,
+                            username: true,
+                            name: true,
+                            nip: true,
+                            role: true,
+                            kelas: true,
+                            mapelDiampu: true,
+                            createdAt: true,
+                        },
+                    }),
                 ])
 
                 const backup = {
+                    appName: "Administrasi Wali Kelas SDN 2 Nangerang",
                     exportDate: new Date().toISOString(),
-                    version: "1.0",
+                    version: "2.0",
+                    summary: {
+                        totalSiswa: siswa.length,
+                        totalAbsensi: absensi.length,
+                        totalNilai: nilai.length,
+                        totalJurnal: jurnal.length,
+                        totalBuku: buku.length,
+                        totalAset: aset.length,
+                        totalKalenderEvent: kalenderEvent.length,
+                        totalRiwayatKelas: riwayatKelas.length,
+                        totalJadwal: jadwalPelajaran.length,
+                        totalAuditNilai: nilaiAuditLog.length,
+                        totalUser: users.length,
+                    },
                     data: {
                         siswa,
                         absensi,
@@ -162,8 +199,25 @@ export async function POST(request: NextRequest) {
                         aset,
                         waliKelas,
                         schoolSettings,
-                        mapelKelas
-                    }
+                        mapelKelas,
+                        kalenderConfig,
+                        kalenderEvent,
+                        riwayatKelas,
+                        jadwalPelajaran,
+                        nilaiAuditLog,
+                        users,
+                    },
+                }
+
+                if (session.user?.id) {
+                    await prisma.activityLog.create({
+                        data: {
+                            userId: session.user.id,
+                            action: "EXPORT_BACKUP",
+                            details: `Admin berhasil mengunduh backup database komprehensif.`,
+                            metadata: JSON.stringify(backup.summary),
+                        },
+                    })
                 }
 
                 return NextResponse.json(backup)

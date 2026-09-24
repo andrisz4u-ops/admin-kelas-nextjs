@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
-
 import { parseToUTCMidnight } from "@/lib/dateUtils"
+
+export const dynamic = "force-dynamic"
 
 // PUT update jurnal
 export async function PUT(
@@ -16,7 +17,28 @@ export async function PUT(
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
         }
 
+        const userRole = session.user.role
+        const userKelas = session.user.kelas
+
+        // Kepsek & Pengawas bersifat Read-Only untuk agenda jurnal
+        if (userRole === "kepsek" || userRole === "pengawas") {
+            return NextResponse.json({ error: "Role Anda hanya memiliki izin baca (view-only)." }, { status: 403 })
+        }
+
         const { id } = await params
+
+        // Periksa apakah jurnal ada dan kepemilikan kelas guru
+        const existing = await prisma.jurnal.findUnique({ where: { id } })
+        if (!existing) {
+            return NextResponse.json({ error: "Jurnal tidak ditemukan" }, { status: 404 })
+        }
+
+        if (userRole === "guru" && userKelas && existing.kelas !== userKelas) {
+            return NextResponse.json({
+                error: `Akses ditolak. Sebagai wali kelas ${userKelas}, Anda tidak berhak mengubah agenda kelas ${existing.kelas}.`
+            }, { status: 403 })
+        }
+
         const body = await request.json()
         const {
             tanggal,
@@ -73,7 +95,28 @@ export async function DELETE(
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
         }
 
+        const userRole = session.user.role
+        const userKelas = session.user.kelas
+
+        // Kepsek & Pengawas bersifat Read-Only untuk agenda jurnal
+        if (userRole === "kepsek" || userRole === "pengawas") {
+            return NextResponse.json({ error: "Role Anda hanya memiliki izin baca (view-only)." }, { status: 403 })
+        }
+
         const { id } = await params
+
+        // Periksa apakah jurnal ada dan kepemilikan kelas guru
+        const existing = await prisma.jurnal.findUnique({ where: { id } })
+        if (!existing) {
+            return NextResponse.json({ error: "Jurnal tidak ditemukan" }, { status: 404 })
+        }
+
+        if (userRole === "guru" && userKelas && existing.kelas !== userKelas) {
+            return NextResponse.json({
+                error: `Akses ditolak. Sebagai wali kelas ${userKelas}, Anda tidak berhak menghapus agenda kelas ${existing.kelas}.`
+            }, { status: 403 })
+        }
+
         await prisma.jurnal.delete({ where: { id } })
 
         return NextResponse.json({ message: "Jurnal deleted" })

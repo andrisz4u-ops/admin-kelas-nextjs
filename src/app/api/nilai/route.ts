@@ -105,38 +105,109 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        // Batch upsert menggunakan prisma.$transaction untuk eliminasi N+1 serial round-trips
-        await prisma.$transaction(
-            entries.map((entry) => {
-                const entryKelas = entry.kelas ? parseInt(String(entry.kelas)) : targetKelas
-                const entrySemester = entry.semester ? parseInt(String(entry.semester)) : fallbackSemester
-                const entryTahunAjaran = entry.tahunAjaran || defaultTahunAjaran
-                const numericNilai = Math.max(0, Math.min(100, parseFloat(entry.nilai) || 0))
+        // Check existing scores to record in NilaiAuditLog
+        const existingNilai = await prisma.nilai.findMany({
+            where: {
+                OR: entries.map((entry) => ({
+                    siswaId: entry.siswaId,
+                    kelas: entry.kelas ? parseInt(String(entry.kelas)) : targetKelas,
+                    tahunAjaran: entry.tahunAjaran || defaultTahunAjaran,
+                    mapel: entry.mapel,
+                    jenisNilai: entry.jenisNilai,
+                    semester: entry.semester ? parseInt(String(entry.semester)) : fallbackSemester,
+                })),
+            },
+        })
 
-                return prisma.nilai.upsert({
-                    where: {
-                        siswaId_kelas_tahunAjaran_mapel_jenisNilai_semester: {
-                            siswaId: entry.siswaId,
-                            kelas: entryKelas,
-                            tahunAjaran: entryTahunAjaran,
-                            mapel: entry.mapel,
-                            jenisNilai: entry.jenisNilai,
-                            semester: entrySemester,
-                        },
-                    },
-                    update: { nilai: numericNilai },
-                    create: {
+        const existingMap = new Map<string, number>()
+        existingNilai.forEach((n) => {
+            const key = `${n.siswaId}_${n.kelas}_${n.tahunAjaran}_${n.mapel}_${n.jenisNilai}_${n.semester}`
+            existingMap.set(key, n.nilai)
+        })
+
+        const auditLogsToCreate: {
+            userId: string
+            siswaId: string
+            kelas: number
+            tahunAjaran: string
+            semester: number
+            mapel: string
+            jenisNilai: string
+            nilaiLama: number | null
+            nilaiBaru: number
+            action: string
+        }[] = []
+
+        const upsertOps = entries.map((entry) => {
+            const entryKelas = entry.kelas ? parseInt(String(entry.kelas)) : targetKelas
+            const entrySemester = entry.semester ? parseInt(String(entry.semester)) : fallbackSemester
+            const entryTahunAjaran = entry.tahunAjaran || defaultTahunAjaran
+            const numericNilai = Math.max(0, Math.min(100, parseFloat(entry.nilai) || 0))
+            const key = `${entry.siswaId}_${entryKelas}_${entryTahunAjaran}_${entry.mapel}_${entry.jenisNilai}_${entrySemester}`
+            const oldVal = existingMap.get(key)
+
+            // Only log if it's a new grade or the value actually changed
+            if (session.user?.id) {
+                if (oldVal === undefined) {
+                    auditLogsToCreate.push({
+                        userId: session.user.id,
+                        siswaId: entry.siswaId,
+                        kelas: entryKelas,
+                        tahunAjaran: entryTahunAjaran,
+                        semester: entrySemester,
+                        mapel: entry.mapel,
+                        jenisNilai: entry.jenisNilai,
+                        nilaiLama: null,
+                        nilaiBaru: numericNilai,
+                        action: "CREATE",
+                    })
+                } else if (oldVal !== numericNilai) {
+                    auditLogsToCreate.push({
+                        userId: session.user.id,
+                        siswaId: entry.siswaId,
+                        kelas: entryKelas,
+                        tahunAjaran: entryTahunAjaran,
+                        semester: entrySemester,
+                        mapel: entry.mapel,
+                        jenisNilai: entry.jenisNilai,
+                        nilaiLama: oldVal,
+                        nilaiBaru: numericNilai,
+                        action: "UPDATE",
+                    })
+                }
+            }
+
+            return prisma.nilai.upsert({
+                where: {
+                    siswaId_kelas_tahunAjaran_mapel_jenisNilai_semester: {
                         siswaId: entry.siswaId,
                         kelas: entryKelas,
                         tahunAjaran: entryTahunAjaran,
                         mapel: entry.mapel,
                         jenisNilai: entry.jenisNilai,
                         semester: entrySemester,
-                        nilai: numericNilai,
                     },
-                })
+                },
+                update: { nilai: numericNilai },
+                create: {
+                    siswaId: entry.siswaId,
+                    kelas: entryKelas,
+                    tahunAjaran: entryTahunAjaran,
+                    mapel: entry.mapel,
+                    jenisNilai: entry.jenisNilai,
+                    semester: entrySemester,
+                    nilai: numericNilai,
+                },
             })
-        )
+        })
+
+        // Batch upsert dan catat audit log dalam 1 transaksi
+        await prisma.$transaction([
+            ...upsertOps,
+            ...(auditLogsToCreate.length > 0
+                ? [prisma.nilaiAuditLog.createMany({ data: auditLogsToCreate })]
+                : []),
+        ])
 
         return NextResponse.json({ success: true, message: `${entries.length} nilai berhasil disimpan.` })
     } catch (error) {

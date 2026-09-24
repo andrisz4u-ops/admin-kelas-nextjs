@@ -27,6 +27,11 @@ export async function GET(request: NextRequest) {
         const defaultSemester = schoolSettings?.semesterAktif || 1
         const semester = parseInt(searchParams.get("semester") || String(defaultSemester))
 
+        // Fetch dynamic kalender config
+        const kalenderConfig = await prisma.kalenderConfig.findUnique({
+            where: { tahunAjaran: currentAcademicYear },
+        })
+
         let startDate: Date, endDate: Date
 
         if (type === "month") {
@@ -34,24 +39,51 @@ export async function GET(request: NextRequest) {
             startDate = range.start
             endDate = range.end
         } else {
-            // Semester
-            // For 2025/2026: Semester 1 starts July 2025, Semester 2 starts Jan 2026
-            const range = getSemesterRange(semester, semester === 1 ? year : year - 1, currentAcademicYear)
-            startDate = range.start
-            endDate = range.end
+            // Semester: use DB config if available, otherwise fallback to static
+            if (kalenderConfig) {
+                if (semester === 1) {
+                    startDate = kalenderConfig.semester1Mulai
+                    endDate = kalenderConfig.semester1Selesai
+                } else {
+                    startDate = kalenderConfig.semester2Mulai
+                    endDate = kalenderConfig.semester2Selesai
+                }
+            } else {
+                const range = getSemesterRange(semester, semester === 1 ? year : year - 1, currentAcademicYear)
+                startDate = range.start
+                endDate = range.end
+            }
         }
 
-        // Get all active students in the class
-        const students = await prisma.siswa.findMany({
-            where: { kelas, status: "aktif" },
-            orderBy: { nama: "asc" },
-            select: { id: true, nis: true, nama: true },
+        // Get students: use RiwayatKelas if available (for exact historical roster), fallback to active students
+        const riwayat = await prisma.riwayatKelas.findMany({
+            where: { kelas, tahunAjaran: currentAcademicYear },
+            include: {
+                siswa: { select: { id: true, nis: true, nama: true } }
+            },
+            orderBy: { siswa: { nama: "asc" } },
         })
 
-        // Get all attendance records in the date range for active students
+        let students: { id: string; nis: string; nama: string }[] = []
+        if (riwayat.length > 0) {
+            students = riwayat.map((r) => r.siswa)
+        } else {
+            students = await prisma.siswa.findMany({
+                where: { kelas, status: "aktif" },
+                orderBy: { nama: "asc" },
+                select: { id: true, nis: true, nama: true },
+            })
+        }
+
+        const studentIds = students.map((s) => s.id)
+
+        // Get all attendance records in the date range for these students and class
         const absensi = await prisma.absensi.findMany({
             where: {
-                siswa: { kelas, status: "aktif" },
+                OR: [
+                    { kelas, tahunAjaran: currentAcademicYear },
+                    { siswaId: { in: studentIds } },
+                ],
                 tanggal: {
                     gte: startDate,
                     lte: endDate,
@@ -64,9 +96,39 @@ export async function GET(request: NextRequest) {
             },
         })
 
-        // Get school days using the calendar (excludes weekends AND holidays)
-        const schoolDays = getSchoolDays(startDate, endDate, currentAcademicYear)
-        const totalSchoolDays = schoolDays.length
+        // Get school days using dynamic DB calendar (excludes weekends AND holidays)
+        const dbHolidayEvents = await prisma.kalenderEvent.findMany({
+            where: {
+                tahunAjaran: currentAcademicYear,
+                OR: [{ isLibur: true }, { tipe: "holiday" }],
+            },
+        })
+
+        let totalSchoolDays = 0
+        if (dbHolidayEvents.length > 0) {
+            const holidaySet = new Set<string>()
+            for (const ev of dbHolidayEvents) {
+                const cur = new Date(ev.tanggalMulai)
+                const stop = ev.tanggalSelesai ? new Date(ev.tanggalSelesai) : new Date(ev.tanggalMulai)
+                while (cur <= stop) {
+                    holidaySet.add(cur.toISOString().split("T")[0])
+                    cur.setDate(cur.getDate() + 1)
+                }
+            }
+            const curDate = new Date(startDate)
+            while (curDate <= endDate) {
+                const day = curDate.getDay()
+                const dateStr = curDate.toISOString().split("T")[0]
+                if (day !== 0 && day !== 6 && !holidaySet.has(dateStr)) {
+                    totalSchoolDays++
+                }
+                curDate.setDate(curDate.getDate() + 1)
+            }
+        } else {
+            // Fallback to static calendar
+            const schoolDays = getSchoolDays(startDate, endDate, currentAcademicYear)
+            totalSchoolDays = schoolDays.length
+        }
 
         // Get all unique dates attendance was actually recorded for this class in the period
         const recordedDates = new Set(absensi.map((a) => {

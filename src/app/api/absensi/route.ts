@@ -38,7 +38,10 @@ export async function GET(request: NextRequest) {
 
         const absensi = await prisma.absensi.findMany({
             where: {
-                siswa: { kelas, status: "aktif" },
+                OR: [
+                    { kelas },
+                    { siswa: { kelas, status: "aktif" } },
+                ],
                 tanggal: {
                     gte: queryDate,
                     lte: queryDateEnd,
@@ -133,6 +136,7 @@ export async function POST(request: NextRequest) {
                     status: entry.status,
                     tahunAjaran: entryTahunAjaran,
                     semester: entrySemester,
+                    kelas: targetKelas || 1,
                 },
                 create: {
                     siswaId: entry.siswaId,
@@ -140,6 +144,7 @@ export async function POST(request: NextRequest) {
                     status: entry.status,
                     tahunAjaran: entryTahunAjaran,
                     semester: entrySemester,
+                    kelas: targetKelas || 1,
                 },
             })
         })
@@ -152,7 +157,7 @@ export async function POST(request: NextRequest) {
             try {
                 const absentList = await prisma.absensi.findMany({
                     where: {
-                        siswa: { kelas: targetKelas, status: "aktif" },
+                        kelas: targetKelas,
                         tanggal: targetDateNormalized,
                     },
                     include: {

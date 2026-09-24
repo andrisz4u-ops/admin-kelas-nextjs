@@ -79,6 +79,32 @@ export async function POST(request: NextRequest) {
                 perKelasBefore[c.kelas] = c._count.id
             }
 
+            // 1.5. Snapshot RiwayatKelas for current academic year before promotion
+            const currentActiveStudents = await tx.siswa.findMany({
+                where: { status: "aktif" },
+                select: { id: true, kelas: true },
+            })
+            for (const s of currentActiveStudents) {
+                await tx.riwayatKelas.upsert({
+                    where: {
+                        siswaId_tahunAjaran: {
+                            siswaId: s.id,
+                            tahunAjaran: tahunAjaranSekarang,
+                        },
+                    },
+                    update: {
+                        kelas: s.kelas,
+                        status: s.kelas === 6 ? "alumni" : "aktif",
+                    },
+                    create: {
+                        siswaId: s.id,
+                        tahunAjaran: tahunAjaranSekarang,
+                        kelas: s.kelas,
+                        status: s.kelas === 6 ? "alumni" : "aktif",
+                    },
+                })
+            }
+
             // 2. Archive class 6 students as alumni and set kelas to 0
             const alumni = await tx.siswa.updateMany({
                 where: { kelas: 6, status: "aktif" },
@@ -115,6 +141,32 @@ export async function POST(request: NextRequest) {
                 where: { kelas: 1, status: "aktif" },
                 data: { kelas: 2 },
             })
+
+            // 3.5. Record RiwayatKelas for newly promoted students in tahunAjaranBaru
+            const newlyPromotedStudents = await tx.siswa.findMany({
+                where: { status: "aktif" },
+                select: { id: true, kelas: true },
+            })
+            for (const s of newlyPromotedStudents) {
+                await tx.riwayatKelas.upsert({
+                    where: {
+                        siswaId_tahunAjaran: {
+                            siswaId: s.id,
+                            tahunAjaran: tahunAjaranBaru,
+                        },
+                    },
+                    update: {
+                        kelas: s.kelas,
+                        status: "aktif",
+                    },
+                    create: {
+                        siswaId: s.id,
+                        tahunAjaran: tahunAjaranBaru,
+                        kelas: s.kelas,
+                        status: "aktif",
+                    },
+                })
+            }
 
             // 4. Update school year in settings
             await tx.schoolSettings.upsert({

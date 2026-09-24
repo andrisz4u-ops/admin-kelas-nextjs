@@ -20,7 +20,8 @@ model User {
   fotoProfilUrl String?       // Profile photo URL
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
-  activityLogs  ActivityLog[]
+  activityLogs   ActivityLog[]
+  nilaiAuditLogs NilaiAuditLog[]
 }
 
 // School settings
@@ -54,8 +55,10 @@ model Siswa {
   tahunLulus   String?   // Tahun ajaran kelulusan, e.g. "2025/2026"
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
-  absensi      Absensi[]
-  nilai        Nilai[]
+  absensi        Absensi[]
+  nilai          Nilai[]
+  riwayatKelas   RiwayatKelas[]
+  nilaiAuditLogs NilaiAuditLog[]
 }
 
 // Daily attendance
@@ -63,6 +66,7 @@ model Absensi {
   id          String   @id @default(cuid())
   siswaId     String
   siswa       Siswa    @relation(fields: [siswaId], references: [id], onDelete: Cascade)
+  kelas       Int      @default(1)
   tanggal     DateTime @db.Date
   status      String   // H, S, I, A
   tahunAjaran String   @default("2026/2027")
@@ -71,6 +75,22 @@ model Absensi {
   @@unique([siswaId, tanggal])
   @@index([tanggal])
   @@index([tahunAjaran, semester])
+  @@index([kelas, tahunAjaran, semester])
+}
+
+// Riwayat Kelas Siswa per Tahun Ajaran (Historical Class Enrollment)
+model RiwayatKelas {
+  id          String   @id @default(cuid())
+  siswaId     String
+  siswa       Siswa    @relation(fields: [siswaId], references: [id], onDelete: Cascade)
+  kelas       Int      // 1-6 (atau 0 untuk alumni)
+  tahunAjaran String   // e.g. "2025/2026", "2026/2027"
+  status      String   @default("aktif") // aktif, alumni
+  createdAt   DateTime @default(now())
+
+  @@unique([siswaId, tahunAjaran])
+  @@index([kelas, tahunAjaran])
+  @@index([siswaId])
 }
 
 // Grades
@@ -210,5 +230,61 @@ model ActivityLog {
 
   @@index([userId])
   @@index([action])
+  @@index([createdAt])
+}
+
+// Kalender Akademik - Konfigurasi Semester per Tahun Ajaran
+model KalenderConfig {
+  id               String   @id @default(cuid())
+  tahunAjaran      String   @unique // e.g. "2026/2027"
+  semester1Mulai   DateTime @db.Date
+  semester1Selesai DateTime @db.Date
+  semester2Mulai   DateTime @db.Date
+  semester2Selesai DateTime @db.Date
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([tahunAjaran])
+}
+
+// Kalender Akademik - Event, Libur, Ujian, Agenda Sekolah
+model KalenderEvent {
+  id             String    @id @default(cuid())
+  tahunAjaran    String    // e.g. "2026/2027"
+  semester       Int?      // 1 or 2
+  tanggalMulai   DateTime  @db.Date
+  tanggalSelesai DateTime? @db.Date // jika rentang (opsional)
+  judul          String
+  deskripsi      String?
+  tipe           String    @default("event") // holiday, exam, event, semester
+  isLibur        Boolean   @default(false)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([tahunAjaran])
+  @@index([tanggalMulai])
+  @@index([tipe])
+}
+
+// Audit Trail Perubahan Nilai Siswa
+model NilaiAuditLog {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  siswaId     String
+  siswa       Siswa    @relation(fields: [siswaId], references: [id], onDelete: Cascade)
+  kelas       Int
+  tahunAjaran String
+  semester    Int
+  mapel       String
+  jenisNilai  String   // UH1, UH2, UH3, UTS, UAS
+  nilaiLama   Float?
+  nilaiBaru   Float
+  action      String   @default("UPDATE") // CREATE, UPDATE, DELETE
+  createdAt   DateTime @default(now())
+
+  @@index([siswaId, tahunAjaran])
+  @@index([userId])
+  @@index([kelas, tahunAjaran, mapel])
   @@index([createdAt])
 }
