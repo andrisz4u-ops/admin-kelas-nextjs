@@ -10,6 +10,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const kelas = searchParams.get("kelas")
     const mapel = searchParams.get("mapel")
+    const semester = searchParams.get("semester")
 
     if (!kelas && !mapel) return NextResponse.json({ error: "Kelas or mapel is required" }, { status: 400 })
 
@@ -21,6 +22,9 @@ export async function GET(request: NextRequest) {
         if (mapel) {
             whereClause.mapel = { contains: mapel, mode: "insensitive" }
         }
+        if (semester) {
+            whereClause.semester = Number(semester)
+        }
 
         const schedule = await prisma.jadwalPelajaran.findMany({
             where: whereClause,
@@ -28,6 +32,7 @@ export async function GET(request: NextRequest) {
         })
         return NextResponse.json(schedule)
     } catch (error) {
+        console.error("Error fetching schedule:", error)
         return NextResponse.json({ error: "Internal server error" }, { status: 500 })
     }
 }
@@ -36,34 +41,91 @@ export async function POST(request: NextRequest) {
     const session = await getServerSession(authOptions)
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
-    // Allow Admin and Guru to edit schedule
-    // Idealnya dicek role, tapi untuk sekarang kita percayakan pada session school logic
+    const userRole = session.user.role
+    if (userRole === "kepsek" || userRole === "pengawas") {
+        return NextResponse.json({ error: "Role Anda hanya memiliki izin baca (view-only)." }, { status: 403 })
+    }
 
     try {
         const body = await request.json()
-        const { id, kelas, hari, jamKe, waktu, mapel, guru } = body
+
+        // Batch Copy Schedule between Semesters
+        if (body.action === "copy_semester") {
+            const { fromSemester, toSemester, kelas: copyKelas } = body
+            if (!fromSemester || !toSemester || !copyKelas) {
+                return NextResponse.json({ error: "fromSemester, toSemester, dan kelas diperlukan" }, { status: 400 })
+            }
+            const sourceSchedules = await prisma.jadwalPelajaran.findMany({
+                where: { kelas: Number(copyKelas), semester: Number(fromSemester) }
+            })
+            if (sourceSchedules.length === 0) {
+                return NextResponse.json({ error: `Tidak ada jadwal di Semester ${fromSemester} untuk disalin.` }, { status: 400 })
+            }
+
+            await prisma.$transaction(
+                sourceSchedules.map((item) => prisma.jadwalPelajaran.upsert({
+                    where: {
+                        kelas_hari_jamKe_semester: {
+                            kelas: Number(copyKelas),
+                            hari: item.hari,
+                            jamKe: item.jamKe,
+                            semester: Number(toSemester)
+                        }
+                    },
+                    update: { waktu: item.waktu, mapel: item.mapel, guru: item.guru },
+                    create: {
+                        kelas: Number(copyKelas),
+                        hari: item.hari,
+                        jamKe: item.jamKe,
+                        waktu: item.waktu,
+                        mapel: item.mapel,
+                        guru: item.guru,
+                        semester: Number(toSemester)
+                    }
+                }))
+            )
+            return NextResponse.json({ success: true, message: `Berhasil menyalin ${sourceSchedules.length} slot jadwal ke Semester ${toSemester}.` })
+        }
+
+        const { id, kelas, hari, jamKe, waktu, mapel, guru, semester } = body
+        const targetSemester = semester ? Number(semester) : 1
 
         if (id) {
             // Update
             const updated = await prisma.jadwalPelajaran.update({
                 where: { id },
-                data: { kelas, hari, jamKe, waktu, mapel, guru }
+                data: {
+                    kelas: Number(kelas),
+                    hari,
+                    jamKe: Number(jamKe),
+                    waktu,
+                    mapel,
+                    guru,
+                    semester: targetSemester
+                }
             })
             return NextResponse.json(updated)
         } else {
-            // Create
-            // Check if slot exists (upsert logic handled by frontend ID or unique constraint)
-            // But if we want to be safe, we can use upsert on unique constraint
+            // Upsert on compound unique key [kelas, hari, jamKe, semester]
             const upserted = await prisma.jadwalPelajaran.upsert({
                 where: {
-                    kelas_hari_jamKe: {
+                    kelas_hari_jamKe_semester: {
                         kelas: Number(kelas),
                         hari,
-                        jamKe: Number(jamKe)
+                        jamKe: Number(jamKe),
+                        semester: targetSemester
                     }
                 },
                 update: { waktu, mapel, guru },
-                create: { kelas: Number(kelas), hari, jamKe: Number(jamKe), waktu, mapel, guru }
+                create: {
+                    kelas: Number(kelas),
+                    hari,
+                    jamKe: Number(jamKe),
+                    waktu,
+                    mapel,
+                    guru,
+                    semester: targetSemester
+                }
             })
             return NextResponse.json(upserted)
         }
@@ -76,6 +138,11 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
     const session = await getServerSession(authOptions)
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+    const userRole = session.user.role
+    if (userRole === "kepsek" || userRole === "pengawas") {
+        return NextResponse.json({ error: "Role Anda hanya memiliki izin baca (view-only)." }, { status: 403 })
+    }
 
     const { searchParams } = new URL(request.url)
     const id = searchParams.get("id")

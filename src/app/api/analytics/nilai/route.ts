@@ -17,6 +17,14 @@ export async function GET(request: NextRequest) {
         const kelas = parseInt(searchParams.get("kelas") || "5")
         const siswaId = searchParams.get("siswaId") || null
         const semester = parseInt(searchParams.get("semester") || "1")
+        const tahunAjaranParam = searchParams.get("tahunAjaran")
+
+        // Ambil tahun ajaran aktif dari master setting jika tidak diberikan
+        let tahunAjaran = tahunAjaranParam
+        if (!tahunAjaran) {
+            const settings = await prisma.schoolSettings.findFirst()
+            tahunAjaran = settings?.tahunAjaran || "2025/2026"
+        }
 
         // Get all active students in class
         const students = await prisma.siswa.findMany({
@@ -25,10 +33,12 @@ export async function GET(request: NextRequest) {
             select: { id: true, nis: true, nama: true }
         })
 
-        // Get all grades for active students in the class filtered by semester
+        // Get all grades for active students in the class filtered by semester, kelas, and tahunAjaran
         const grades = await prisma.nilai.findMany({
             where: {
                 siswa: { kelas, status: "aktif" },
+                kelas,
+                tahunAjaran,
                 semester,
             },
             include: { siswa: { select: { id: true, nama: true } } }
@@ -132,6 +142,8 @@ export async function GET(request: NextRequest) {
 
         return NextResponse.json({
             kelas,
+            semester,
+            tahunAjaran,
             totalStudents: students.length,
             totalGrades: grades.length,
             overallClassAvg,

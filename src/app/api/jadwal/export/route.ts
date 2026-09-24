@@ -14,26 +14,20 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const kelas = searchParams.get("kelas")
+    const semester = searchParams.get("semester") || "1"
 
     if (!kelas) return NextResponse.json({ error: "Kelas is required" }, { status: 400 })
 
     try {
         const schedule = await prisma.jadwalPelajaran.findMany({
-            where: { kelas: Number(kelas) },
+            where: {
+                kelas: Number(kelas),
+                semester: Number(semester)
+            },
         })
 
-        /*
-                // Read logo
-                const logoPath = path.join(process.cwd(), "public", "logo-sekolah.png")
-                let logoBuffer: Buffer | null = null
-                try {
-                    logoBuffer = await fs.readFile(logoPath)
-                } catch (e) {
-                    console.error("Logo not found", e)
-                }
-        */
         const wb = new ExcelJS.Workbook()
-        const ws = wb.addWorksheet(`Jadwal Kelas ${kelas}`)
+        const ws = wb.addWorksheet(`Jadwal Kelas ${kelas} Sem ${semester}`)
 
         // Add Header (Kop)
         // Merge A1:G1 for School Name
@@ -87,7 +81,7 @@ export async function GET(request: NextRequest) {
         // Title for the Schedule
         ws.mergeCells(`A${TABLE_START_ROW}:G${TABLE_START_ROW}`)
         const scheduleTitle = ws.getCell(`A${TABLE_START_ROW}`)
-        scheduleTitle.value = `JADWAL PELAJARAN KELAS ${kelas}`
+        scheduleTitle.value = `JADWAL PELAJARAN KELAS ${kelas} (SEMESTER ${semester})`
         scheduleTitle.alignment = { vertical: 'middle', horizontal: 'center' }
         scheduleTitle.font = { name: 'Arial', size: 12, bold: true }
 

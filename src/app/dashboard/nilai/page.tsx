@@ -35,6 +35,7 @@ export default function NilaiPage() {
     const [saving, setSaving] = useState(false)
     const [kelas, setKelas] = useState(userKelas || 1)
     const [semester, setSemester] = useState(1)
+    const [tahunAjaran, setTahunAjaran] = useState("2025/2026")
     const [mapel, setMapel] = useState("")
     const [jenisNilai, setJenisNilai] = useState("")
 
@@ -52,7 +53,7 @@ export default function NilaiPage() {
         return getMapelByKelas(kelas).filter(m => !isExclusiveMapel(m))
     }, [kelas, isAdmin, isPengawas, isKepsek, isGuruMapel, userMapelDiampu])
 
-    // Cek query param ?kelas= dan lock kelas untuk guru biasa saja, serta load semester aktif
+    // Cek query param ?kelas= dan lock kelas untuk guru biasa saja, serta load semester dan tahun ajaran aktif
     useEffect(() => {
         if (typeof window !== "undefined") {
             const params = new URLSearchParams(window.location.search)
@@ -65,12 +66,15 @@ export default function NilaiPage() {
             setKelas(userKelas)
         }
 
-        // Ambil semester aktif dari pengaturan sekolah
+        // Ambil semester dan tahun ajaran aktif dari pengaturan sekolah
         fetch("/api/settings/school")
             .then(res => res.ok ? res.json() : null)
             .then(data => {
                 if (data?.semesterAktif) {
                     setSemester(Number(data.semesterAktif))
+                }
+                if (data?.tahunAjaran) {
+                    setTahunAjaran(data.tahunAjaran)
                 }
             })
             .catch(() => {})
@@ -82,7 +86,7 @@ export default function NilaiPage() {
             setLoading(true)
             const [siswaRes, nilaiRes] = await Promise.all([
                 fetch(`/api/siswa?kelas=${kelas}`),
-                fetch(`/api/nilai?kelas=${kelas}&mapel=${encodeURIComponent(mapel)}&jenisNilai=${jenisNilai}&semester=${semester}`)
+                fetch(`/api/nilai?kelas=${kelas}&mapel=${encodeURIComponent(mapel)}&jenisNilai=${jenisNilai}&semester=${semester}&tahunAjaran=${encodeURIComponent(tahunAjaran)}`)
             ])
             const siswaData = await siswaRes.json()
             const nilaiData = await nilaiRes.json()
@@ -96,11 +100,11 @@ export default function NilaiPage() {
         } finally {
             setLoading(false)
         }
-    }, [kelas, mapel, jenisNilai, semester])
+    }, [kelas, mapel, jenisNilai, semester, tahunAjaran])
 
     useEffect(() => {
         if (mapel && jenisNilai) fetchData()
-    }, [fetchData, mapel, jenisNilai, semester])
+    }, [fetchData, mapel, jenisNilai, semester, tahunAjaran])
 
     const handleNilaiChange = (studentId: string, value: string) => {
         if (isReadOnly) return
@@ -116,12 +120,12 @@ export default function NilaiPage() {
         setSaving(true)
         try {
             const entries = Object.entries(nilai).filter(([, v]) => !isNaN(v)).map(([siswaId, nilaiValue]) => ({
-                siswaId, mapel, jenisNilai, nilai: nilaiValue, semester, kelas
+                siswaId, mapel, jenisNilai, nilai: nilaiValue, semester, kelas, tahunAjaran
             }))
             const res = await fetch("/api/nilai", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ entries, semester, kelas }),
+                body: JSON.stringify({ entries, semester, kelas, tahunAjaran }),
             })
             if (res.ok) toast.success("Nilai berhasil disimpan!")
             else {
@@ -169,6 +173,23 @@ export default function NilaiPage() {
                             Kelas {kelas}
                         </span>
                     )}
+
+                    {/* Tahun Ajaran selector */}
+                    <div className="relative">
+                        <select
+                            value={tahunAjaran}
+                            onChange={(e) => setTahunAjaran(e.target.value)}
+                            className="h-9 pl-3 pr-8 bg-white border border-[var(--border)] rounded-md text-sm text-[var(--foreground)] outline-none focus:ring-1 focus:ring-black cursor-pointer appearance-none font-medium"
+                        >
+                            <option value="2024/2025">TP 2024/2025</option>
+                            <option value="2025/2026">TP 2025/2026</option>
+                            <option value="2026/2027">TP 2026/2027</option>
+                            <option value="2027/2028">TP 2027/2028</option>
+                        </select>
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[var(--accents-5)]">
+                            <svg width="10" height="6" viewBox="0 0 10 6" fill="none"><path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                        </div>
+                    </div>
 
                     {/* Semester Selector */}
                     <div className="relative">

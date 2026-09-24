@@ -183,11 +183,12 @@ model JadwalPelajaran {
   waktu     String   // Format: "07:00 - 07:35"
   mapel     String   // Nama mata pelajaran
   guru      String?  // Nama guru (opsional, untuk guru mapel)
+  semester  Int      @default(1) // 1 atau 2
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([kelas, hari, jamKe])
-  @@index([kelas])
+  @@unique([kelas, hari, jamKe, semester])
+  @@index([kelas, semester])
 }
 
 // Activity Log for audit trail

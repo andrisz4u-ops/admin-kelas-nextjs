@@ -53,16 +53,17 @@ export default function RekapAbsensiPage() {
     const [month, setMonth] = useState(new Date().getMonth())
     const [year, setYear] = useState(new Date().getFullYear())
     const [tahunAjaran, setTahunAjaran] = useState("2025/2026")
+    const [semester, setSemester] = useState(1)
 
     useEffect(() => {
         fetch("/api/settings/school")
             .then(res => res.json())
             .then(data => {
                 if (data?.tahunAjaran) setTahunAjaran(data.tahunAjaran)
+                if (data?.semesterAktif) setSemester(Number(data.semesterAktif))
             })
             .catch(() => {})
     }, [])
-    const [semester, setSemester] = useState(2) // Semester 2 mulai 12 Jan 2026
 
     useEffect(() => {
         if (typeof window !== "undefined") {
@@ -87,6 +88,7 @@ export default function RekapAbsensiPage() {
                 month: month.toString(),
                 year: year.toString(),
                 semester: semester.toString(),
+                tahunAjaran,
             })
             const res = await fetch(`/api/rekap/absensi?${params}`, { cache: "no-store" })
             const data = await res.json()
@@ -97,7 +99,7 @@ export default function RekapAbsensiPage() {
         } finally {
             setLoading(false)
         }
-    }, [kelas, type, month, year, semester])
+    }, [kelas, type, month, year, semester, tahunAjaran])
 
     useEffect(() => {
         fetchData()
@@ -593,12 +595,19 @@ export default function RekapAbsensiPage() {
                             </div>
                             <div className="relative">
                                 <select
-                                    value={year}
-                                    onChange={(e) => setYear(Number(e.target.value))}
-                                    className="h-9 pl-3 pr-8 bg-white border border-[var(--border)] rounded-md text-sm text-[var(--foreground)] outline-none focus:ring-1 focus:ring-black cursor-pointer appearance-none"
+                                    value={tahunAjaran}
+                                    onChange={(e) => {
+                                        const selectedTa = e.target.value
+                                        setTahunAjaran(selectedTa)
+                                        const endYear = parseInt(selectedTa.split("/")[1]) || 2026
+                                        setYear(endYear)
+                                    }}
+                                    className="h-9 pl-3 pr-8 bg-white border border-[var(--border)] rounded-md text-sm text-[var(--foreground)] outline-none focus:ring-1 focus:ring-black cursor-pointer appearance-none font-medium"
                                 >
-                                    <option value={2026}>2025/2026</option>
-                                    <option value={2027}>2026/2027</option>
+                                    <option value="2024/2025">2024/2025</option>
+                                    <option value="2025/2026">2025/2026</option>
+                                    <option value="2026/2027">2026/2027</option>
+                                    <option value="2027/2028">2027/2028</option>
                                 </select>
                                 <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[var(--accents-5)]">
                                     <svg width="10" height="6" viewBox="0 0 10 6" fill="none"><path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>

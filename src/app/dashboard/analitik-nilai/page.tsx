@@ -62,6 +62,7 @@ export default function AnalitikNilaiPage() {
 
     const [kelas, setKelas] = useState(userKelas || 1)
     const [semester, setSemester] = useState(1)
+    const [tahunAjaran, setTahunAjaran] = useState("2025/2026")
     const [data, setData] = useState<AnalyticsData | null>(null)
     const [loading, setLoading] = useState(true)
     const [selectedStudent, setSelectedStudent] = useState<string | null>(null)
@@ -78,12 +79,15 @@ export default function AnalitikNilaiPage() {
             setKelas(userKelas)
         }
 
-        // Ambil semester aktif dari pengaturan sekolah
+        // Ambil semester dan tahun ajaran aktif dari master pengaturan
         fetch("/api/settings/school")
             .then(res => res.ok ? res.json() : null)
             .then(data => {
                 if (data?.semesterAktif) {
                     setSemester(Number(data.semesterAktif))
+                }
+                if (data?.tahunAjaran) {
+                    setTahunAjaran(data.tahunAjaran)
                 }
             })
             .catch(() => {})
@@ -94,7 +98,8 @@ export default function AnalitikNilaiPage() {
             setLoading(true)
             const params = new URLSearchParams({
                 kelas: kelas.toString(),
-                semester: semester.toString()
+                semester: semester.toString(),
+                tahunAjaran,
             })
             if (selectedStudent) params.append("siswaId", selectedStudent)
 
@@ -108,7 +113,7 @@ export default function AnalitikNilaiPage() {
         } finally {
             setLoading(false)
         }
-    }, [kelas, semester, selectedStudent])
+    }, [kelas, semester, selectedStudent, tahunAjaran])
 
     useEffect(() => {
         fetchData()
@@ -140,7 +145,7 @@ export default function AnalitikNilaiPage() {
                         Analisis performa nilai siswa per kelas
                     </p>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3">
                     {canSelectKelas ? (
                         <div className="relative">
                             <select
@@ -159,11 +164,32 @@ export default function AnalitikNilaiPage() {
                             Kelas {kelas}
                         </span>
                     )}
+
+                    {/* Tahun Ajaran selector */}
+                    <div className="relative">
+                        <select
+                            value={tahunAjaran}
+                            onChange={(e) => {
+                                setTahunAjaran(e.target.value)
+                                setSelectedStudent(null)
+                            }}
+                            className="h-9 pl-3 pr-8 bg-white border border-[var(--border)] rounded-md text-sm outline-none focus:ring-1 focus:ring-black cursor-pointer appearance-none font-medium"
+                        >
+                            <option value="2024/2025">TP 2024/2025</option>
+                            <option value="2025/2026">TP 2025/2026</option>
+                            <option value="2026/2027">TP 2026/2027</option>
+                            <option value="2027/2028">TP 2027/2028</option>
+                        </select>
+                    </div>
+
                     {/* Semester selector */}
                     <div className="relative">
                         <select
                             value={semester}
-                            onChange={(e) => setSemester(Number(e.target.value))}
+                            onChange={(e) => {
+                                setSemester(Number(e.target.value))
+                                setSelectedStudent(null)
+                            }}
                             className="h-9 pl-3 pr-8 bg-white border border-[var(--border)] rounded-md text-sm outline-none focus:ring-1 focus:ring-black cursor-pointer appearance-none"
                         >
                             <option value={1}>Semester 1</option>

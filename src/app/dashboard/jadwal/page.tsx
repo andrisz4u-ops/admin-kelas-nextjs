@@ -26,6 +26,7 @@ interface ScheduleItem {
     waktu: string
     mapel: string
     guru: string | null
+    semester: number
 }
 
 const DAYS = ["Senin", "Selasa", "Rabu", "Kamis", "Jumat"]
@@ -42,6 +43,20 @@ export default function JadwalPage() {
     const userKelas = session?.user?.kelas
 
     const [kelas, setKelas] = useState<number>(userKelas || 1)
+    const [semester, setSemester] = useState<number>(1)
+    const [copying, setCopying] = useState(false)
+
+    // Load active semester from master settings
+    useEffect(() => {
+        fetch("/api/settings/school")
+            .then(res => res.ok ? res.json() : null)
+            .then(data => {
+                if (data?.semesterAktif) {
+                    setSemester(Number(data.semesterAktif))
+                }
+            })
+            .catch(() => {})
+    }, [])
 
     // Lock kelas untuk wali kelas biasa, izinkan admin, pengawas, kepsek, guru_mapel pilih kelas
     useEffect(() => {
@@ -74,7 +89,7 @@ export default function JadwalPage() {
     const fetchSchedule = useCallback(async () => {
         try {
             setLoading(true)
-            const res = await fetch(`/api/jadwal?kelas=${kelas}`)
+            const res = await fetch(`/api/jadwal?kelas=${kelas}&semester=${semester}`)
             if (res.ok) {
                 const data = await res.json()
                 setSchedule(data)
@@ -84,11 +99,11 @@ export default function JadwalPage() {
         } finally {
             setLoading(false)
         }
-    }, [kelas])
+    }, [kelas, semester])
 
     useEffect(() => {
         if (kelas) fetchSchedule()
-    }, [fetchSchedule, kelas])
+    }, [fetchSchedule, kelas, semester])
 
     // Use Preset Times for rows
     const rows = PRESET_TIMES
@@ -122,7 +137,8 @@ export default function JadwalPage() {
                 jamKe: jam,
                 waktu: existingTime,
                 mapel: "",
-                guru: ""
+                guru: "",
+                semester,
             })
         }
         setIsModalOpen(true)
@@ -135,7 +151,8 @@ export default function JadwalPage() {
         try {
             const payload = {
                 ...editingItem,
-                kelas // Ensure current class is used
+                kelas, // Ensure current class is used
+                semester,
             }
 
             const res = await fetch("/api/jadwal", {
@@ -181,9 +198,39 @@ export default function JadwalPage() {
         setIsDeleteModalOpen(true)
     }
 
+    const handleCopyFromSemester = async (fromSem: number) => {
+        if (isReadOnly || (!isAdmin && !isGuru)) return
+        if (!confirm(`Salin semua jadwal dari Semester ${fromSem} ke Semester ${semester}? Jadwal di semester ${semester} yang bertabrakan akan ditimpa.`)) {
+            return
+        }
+        try {
+            setCopying(true)
+            const res = await fetch("/api/jadwal", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    action: "copy_semester",
+                    fromSemester: fromSem,
+                    toSemester: semester,
+                    kelas
+                })
+            })
+            const data = await res.json()
+            if (res.ok) {
+                toast.success(data.message || "Jadwal berhasil disalin")
+                fetchSchedule()
+            } else {
+                toast.error(data.error || "Gagal menyalin jadwal")
+            }
+        } catch (error) {
+            toast.error("Terjadi kesalahan saat menyalin jadwal")
+        } finally {
+            setCopying(false)
+        }
+    }
 
     const handleExport = () => {
-        window.open(`/api/jadwal/export?kelas=${kelas}`, '_blank')
+        window.open(`/api/jadwal/export?kelas=${kelas}&semester=${semester}`, '_blank')
     }
 
     const getSubjectColor = (mapel: string) => {
@@ -213,6 +260,9 @@ export default function JadwalPage() {
                 <div>
                     <div className="flex items-center gap-2">
                         <h1 className="text-2xl font-bold tracking-tight text-[var(--foreground)]">Jadwal Pelajaran Kelas {kelas}</h1>
+                        <span className="px-2 py-0.5 rounded text-xs bg-blue-100 text-blue-700 font-semibold border border-blue-200">
+                            Semester {semester}
+                        </span>
                         {isReadOnly && (
                             <span className="px-2.5 py-0.5 rounded text-xs bg-purple-100 text-purple-700 font-semibold border border-purple-200">
                                 Mode Supervisi (Hanya Lihat)
@@ -224,6 +274,7 @@ export default function JadwalPage() {
                     </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
+                    {/* Class selector */}
                     {canSelectKelas ? (
                         <div className="relative">
                             <select
@@ -243,6 +294,32 @@ export default function JadwalPage() {
                         </span>
                     )}
 
+                    {/* Semester Switcher */}
+                    <div className="flex rounded-md border border-[var(--border)] overflow-hidden bg-white shadow-sm">
+                        <button
+                            type="button"
+                            onClick={() => setSemester(1)}
+                            className={`px-3 py-1.5 text-xs sm:text-sm font-medium transition-colors ${
+                                semester === 1
+                                    ? "bg-black text-white"
+                                    : "text-[var(--foreground)] hover:bg-[var(--accents-1)]"
+                            }`}
+                        >
+                            Semester 1
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setSemester(2)}
+                            className={`px-3 py-1.5 text-xs sm:text-sm font-medium transition-colors ${
+                                semester === 2
+                                    ? "bg-black text-white"
+                                    : "text-[var(--foreground)] hover:bg-[var(--accents-1)]"
+                            }`}
+                        >
+                            Semester 2
+                        </button>
+                    </div>
+
                     <button
                         onClick={handleExport}
                         className="h-9 px-4 bg-emerald-600 text-white rounded-md text-sm font-medium hover:bg-emerald-700 transition-colors flex items-center gap-2"
@@ -256,6 +333,28 @@ export default function JadwalPage() {
                     </button>
                 </div>
             </div>
+
+            {/* Empty Semester Notification & Copy Action */}
+            {schedule.length === 0 && !loading && (
+                <div className="p-4 rounded-lg bg-amber-50 border border-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-amber-900 text-sm">
+                    <div className="flex items-center gap-2">
+                        <span className="text-lg">ℹ️</span>
+                        <span>
+                            Belum ada jadwal pelajaran untuk <strong>Kelas {kelas} - Semester {semester}</strong>. Anda dapat mengklik slot kosong di tabel atau menyalin dari semester lain.
+                        </span>
+                    </div>
+                    {!isReadOnly && (isAdmin || isGuru) && (
+                        <button
+                            type="button"
+                            onClick={() => handleCopyFromSemester(semester === 1 ? 2 : 1)}
+                            disabled={copying}
+                            className="px-3 py-1.5 bg-amber-600 text-white text-xs font-semibold rounded hover:bg-amber-700 transition disabled:opacity-50 whitespace-nowrap self-start sm:self-auto cursor-pointer"
+                        >
+                            {copying ? "Menyalin..." : `Salin dari Semester ${semester === 1 ? 2 : 1}`}
+                        </button>
+                    )}
+                </div>
+            )}
 
             {/* Schedule Grid */}
             <div className="turbo-card overflow-hidden">

@@ -19,7 +19,13 @@ export async function GET(request: NextRequest) {
         const type = searchParams.get("type") || "month" // "month" or "semester"
         const month = parseInt(searchParams.get("month") || new Date().getMonth().toString())
         const year = parseInt(searchParams.get("year") || new Date().getFullYear().toString())
-        const semester = parseInt(searchParams.get("semester") || "2")
+        const tahunAjaranParam = searchParams.get("tahunAjaran")
+
+        // Fetch school settings upfront for academic year and default semester
+        const schoolSettings = await prisma.schoolSettings.findFirst()
+        const currentAcademicYear = tahunAjaranParam || schoolSettings?.tahunAjaran || "2025/2026"
+        const defaultSemester = schoolSettings?.semesterAktif || 1
+        const semester = parseInt(searchParams.get("semester") || String(defaultSemester))
 
         let startDate: Date, endDate: Date
 
@@ -30,7 +36,7 @@ export async function GET(request: NextRequest) {
         } else {
             // Semester
             // For 2025/2026: Semester 1 starts July 2025, Semester 2 starts Jan 2026
-            const range = getSemesterRange(semester, semester === 1 ? year : year - 1)
+            const range = getSemesterRange(semester, semester === 1 ? year : year - 1, currentAcademicYear)
             startDate = range.start
             endDate = range.end
         }
@@ -59,7 +65,7 @@ export async function GET(request: NextRequest) {
         })
 
         // Get school days using the calendar (excludes weekends AND holidays)
-        const schoolDays = getSchoolDays(startDate, endDate)
+        const schoolDays = getSchoolDays(startDate, endDate, currentAcademicYear)
         const totalSchoolDays = schoolDays.length
 
         // Get all unique dates attendance was actually recorded for this class in the period
@@ -117,9 +123,6 @@ export async function GET(request: NextRequest) {
             }
         })
 
-        // Fetch school settings to know which calendar to use
-        const schoolSettings = await prisma.schoolSettings.findFirst()
-        const currentAcademicYear = schoolSettings?.tahunAjaran || "2026/2027"
         const calendar = getCalendar(currentAcademicYear)
 
         // Get list of holidays in the period for reference
@@ -147,6 +150,7 @@ export async function GET(request: NextRequest) {
                 type,
                 month: type === "month" ? month : undefined,
                 semester: type === "semester" ? semester : undefined,
+                tahunAjaran: currentAcademicYear,
                 year,
                 kelas,
             },

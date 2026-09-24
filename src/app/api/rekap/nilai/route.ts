@@ -20,6 +20,14 @@ export async function GET(request: NextRequest) {
         const kelas = parseInt(searchParams.get("kelas") || "5")
         const semester = parseInt(searchParams.get("semester") || "1")
         const mapel = searchParams.get("mapel") || "" // Optional: specific mapel
+        const tahunAjaranParam = searchParams.get("tahunAjaran")
+
+        // Ambil tahun ajaran aktif dari master setting jika tidak diberikan
+        let tahunAjaran = tahunAjaranParam
+        if (!tahunAjaran) {
+            const settings = await prisma.schoolSettings.findFirst()
+            tahunAjaran = settings?.tahunAjaran || "2025/2026"
+        }
 
         // Get all active students in the class
         const students = await prisma.siswa.findMany({
@@ -28,9 +36,11 @@ export async function GET(request: NextRequest) {
             select: { id: true, nis: true, nama: true },
         })
 
-        // Get all nilai for active students in the class filtered by semester
-        const whereClause: { siswa: { kelas: number; status: string }; semester: number; mapel?: string } = {
+        // Get all nilai for active students in the class filtered by semester, kelas, and tahunAjaran
+        const whereClause: any = {
             siswa: { kelas, status: "aktif" },
+            kelas,
+            tahunAjaran,
             semester,
         }
         if (mapel) {
@@ -94,6 +104,7 @@ export async function GET(request: NextRequest) {
             meta: {
                 kelas,
                 semester,
+                tahunAjaran,
                 mapelList,
                 jenisNilaiList,
                 selectedMapel: mapel || "all",

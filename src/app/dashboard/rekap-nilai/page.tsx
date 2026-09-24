@@ -45,6 +45,7 @@ export default function RekapNilaiPage() {
     const [loading, setLoading] = useState(false)
     const [kelas, setKelas] = useState(userKelas || 1)
     const [semester, setSemester] = useState(1)
+    const [tahunAjaran, setTahunAjaran] = useState("2025/2026")
     const [selectedMapel, setSelectedMapel] = useState("")
     const [viewMode, setViewMode] = useState<"summary" | "detail">("summary")
 
@@ -60,12 +61,15 @@ export default function RekapNilaiPage() {
             setKelas(userKelas)
         }
 
-        // Ambil semester aktif dari pengaturan sekolah
+        // Ambil semester dan tahun ajaran aktif dari pengaturan sekolah
         fetch("/api/settings/school")
             .then(res => res.ok ? res.json() : null)
             .then(data => {
                 if (data?.semesterAktif) {
                     setSemester(Number(data.semesterAktif))
+                }
+                if (data?.tahunAjaran) {
+                    setTahunAjaran(data.tahunAjaran)
                 }
             })
             .catch(() => {})
@@ -78,6 +82,7 @@ export default function RekapNilaiPage() {
                 kelas: kelas.toString(),
                 semester: semester.toString(),
                 mapel: selectedMapel,
+                tahunAjaran,
             })
             const res = await fetch(`/api/rekap/nilai?${params}`, { cache: "no-store" })
             const data = await res.json()
@@ -88,7 +93,7 @@ export default function RekapNilaiPage() {
         } finally {
             setLoading(false)
         }
-    }, [kelas, semester, selectedMapel])
+    }, [kelas, semester, selectedMapel, tahunAjaran])
 
     useEffect(() => {
         fetchData()
@@ -119,7 +124,7 @@ export default function RekapNilaiPage() {
         const ws = XLSX.utils.json_to_sheet(data)
         const wb = XLSX.utils.book_new()
         XLSX.utils.book_append_sheet(wb, ws, "Rekap Nilai")
-        XLSX.writeFile(wb, `Rekap_Nilai_Kelas${kelas}_Semester${semester}.xlsx`)
+        XLSX.writeFile(wb, `Rekap_Nilai_Kelas${kelas}_${tahunAjaran.replace(/\//g, "-")}_Semester${semester}.xlsx`)
         toast.success("Data berhasil diexport!")
     }
 
@@ -147,7 +152,7 @@ export default function RekapNilaiPage() {
         const ws = XLSX.utils.json_to_sheet(data)
         const wb = XLSX.utils.book_new()
         XLSX.utils.book_append_sheet(wb, ws, selectedMapel)
-        XLSX.writeFile(wb, `Nilai_${selectedMapel.replace(/\s/g, "_")}_Kelas${kelas}_Semester${semester}.xlsx`)
+        XLSX.writeFile(wb, `Nilai_${selectedMapel.replace(/\s/g, "_")}_Kelas${kelas}_${tahunAjaran.replace(/\//g, "-")}_Semester${semester}.xlsx`)
         toast.success("Data berhasil diexport!")
     }
 
@@ -179,6 +184,23 @@ export default function RekapNilaiPage() {
                             Kelas {kelas}
                         </span>
                     )}
+
+                    {/* Tahun Ajaran selector */}
+                    <div className="relative">
+                        <select
+                            value={tahunAjaran}
+                            onChange={(e) => setTahunAjaran(e.target.value)}
+                            className="h-9 pl-3 pr-8 bg-white border border-[var(--border)] rounded-md text-sm text-[var(--foreground)] outline-none focus:ring-1 focus:ring-black cursor-pointer appearance-none font-medium"
+                        >
+                            <option value="2024/2025">TP 2024/2025</option>
+                            <option value="2025/2026">TP 2025/2026</option>
+                            <option value="2026/2027">TP 2026/2027</option>
+                            <option value="2027/2028">TP 2027/2028</option>
+                        </select>
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[var(--accents-5)]">
+                            <svg width="10" height="6" viewBox="0 0 10 6" fill="none"><path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                        </div>
+                    </div>
 
                     {/* Semester selector */}
                     <div className="relative">
