@@ -62,7 +62,7 @@ export default function AnalitikNilaiPage() {
 
     const [kelas, setKelas] = useState(userKelas || 1)
     const [semester, setSemester] = useState(1)
-    const [tahunAjaran, setTahunAjaran] = useState("2025/2026")
+    const [tahunAjaran, setTahunAjaran] = useState("2026/2027")
     const [data, setData] = useState<AnalyticsData | null>(null)
     const [loading, setLoading] = useState(true)
     const [selectedStudent, setSelectedStudent] = useState<string | null>(null)

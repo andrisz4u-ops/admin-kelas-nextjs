@@ -76,7 +76,7 @@ model Nilai {
   siswaId     String
   siswa       Siswa    @relation(fields: [siswaId], references: [id], onDelete: Cascade)
   kelas       Int      @default(1)
-  tahunAjaran String   @default("2025/2026")
+  tahunAjaran String   @default("2026/2027")
   mapel       String
   jenisNilai  String   // UH1, UH2, UH3, UTS, UAS
   nilai       Float

@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
         let tahunAjaran = tahunAjaranParam
         if (!tahunAjaran) {
             const settings = await prisma.schoolSettings.findFirst()
-            tahunAjaran = settings?.tahunAjaran || "2025/2026"
+            tahunAjaran = settings?.tahunAjaran || "2026/2027"
         }
 
         // Get all active students in class

@@ -52,7 +52,7 @@ export default function RekapAbsensiPage() {
     const [type, setType] = useState<"month" | "semester">("month")
     const [month, setMonth] = useState(new Date().getMonth())
     const [year, setYear] = useState(new Date().getFullYear())
-    const [tahunAjaran, setTahunAjaran] = useState("2025/2026")
+    const [tahunAjaran, setTahunAjaran] = useState("2026/2027")
     const [semester, setSemester] = useState(1)
 
     useEffect(() => {

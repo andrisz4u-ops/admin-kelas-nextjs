@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
         let tahunAjaran = tahunAjaranParam
         if (!tahunAjaran) {
             const settings = await prisma.schoolSettings.findFirst()
-            tahunAjaran = settings?.tahunAjaran || "2025/2026"
+            tahunAjaran = settings?.tahunAjaran || "2026/2027"
         }
 
         const nilai = await prisma.nilai.findMany({
@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
         let defaultTahunAjaran = bodyTahunAjaran
         if (!defaultTahunAjaran) {
             const settings = await prisma.schoolSettings.findFirst()
-            defaultTahunAjaran = settings?.tahunAjaran || "2025/2026"
+            defaultTahunAjaran = settings?.tahunAjaran || "2026/2027"
         }
 
         // Tentukan kelas sasaran

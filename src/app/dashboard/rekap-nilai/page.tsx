@@ -45,7 +45,7 @@ export default function RekapNilaiPage() {
     const [loading, setLoading] = useState(false)
     const [kelas, setKelas] = useState(userKelas || 1)
     const [semester, setSemester] = useState(1)
-    const [tahunAjaran, setTahunAjaran] = useState("2025/2026")
+    const [tahunAjaran, setTahunAjaran] = useState("2026/2027")
     const [selectedMapel, setSelectedMapel] = useState("")
     const [viewMode, setViewMode] = useState<"summary" | "detail">("summary")
 

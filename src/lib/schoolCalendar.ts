@@ -88,8 +88,8 @@ export const getCalendar = (tahunAjaran: string) => {
     return SCHOOL_CALENDAR_2025_2026
 }
 
-// Helper function: Check if a date is a holiday (defaults to 2025/2026)
-export function isHoliday(date: Date, tahunAjaran: string = "2025/2026"): boolean {
+// Helper function: Check if a date is a holiday (defaults to 2026/2027)
+export function isHoliday(date: Date, tahunAjaran: string = "2026/2027"): boolean {
     const dateStr = date.toISOString().split('T')[0]
     const calendar = getCalendar(tahunAjaran)
     return calendar.holidays.includes(dateStr)
@@ -102,7 +102,7 @@ export function isWeekend(date: Date): boolean {
 }
 
 // Helper function: Check if a date is a school day
-export function isSchoolDay(date: Date, tahunAjaran: string = "2025/2026"): boolean {
+export function isSchoolDay(date: Date, tahunAjaran: string = "2026/2027"): boolean {
     return !isWeekend(date) && !isHoliday(date, tahunAjaran)
 }
 
@@ -172,7 +172,7 @@ export const SCHOOL_CALENDAR_2026_2027 = {
 }
 
 // Helper function: Get all school days in a date range
-export function getSchoolDays(startDate: Date, endDate: Date, tahunAjaran: string = "2025/2026"): Date[] {
+export function getSchoolDays(startDate: Date, endDate: Date, tahunAjaran: string = "2026/2027"): Date[] {
     const days: Date[] = []
     const current = new Date(startDate)
 
@@ -187,7 +187,7 @@ export function getSchoolDays(startDate: Date, endDate: Date, tahunAjaran: strin
 }
 
 // Helper function: Get semester date range
-export function getSemesterRange(semester: number, year: number, tahunAjaran: string = "2025/2026"): { start: Date; end: Date } {
+export function getSemesterRange(semester: number, year: number, tahunAjaran: string = "2026/2027"): { start: Date; end: Date } {
     const calendar = getCalendar(tahunAjaran)
     if (semester === 1) {
         return calendar.semester1

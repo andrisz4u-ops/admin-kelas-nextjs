@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
 
         // Fetch school settings upfront for academic year and default semester
         const schoolSettings = await prisma.schoolSettings.findFirst()
-        const currentAcademicYear = tahunAjaranParam || schoolSettings?.tahunAjaran || "2025/2026"
+        const currentAcademicYear = tahunAjaranParam || schoolSettings?.tahunAjaran || "2026/2027"
         const defaultSemester = schoolSettings?.semesterAktif || 1
         const semester = parseInt(searchParams.get("semester") || String(defaultSemester))
 

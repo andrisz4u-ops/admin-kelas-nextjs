@@ -35,7 +35,7 @@ export default function NilaiPage() {
     const [saving, setSaving] = useState(false)
     const [kelas, setKelas] = useState(userKelas || 1)
     const [semester, setSemester] = useState(1)
-    const [tahunAjaran, setTahunAjaran] = useState("2025/2026")
+    const [tahunAjaran, setTahunAjaran] = useState("2026/2027")
     const [mapel, setMapel] = useState("")
     const [jenisNilai, setJenisNilai] = useState("")
 
