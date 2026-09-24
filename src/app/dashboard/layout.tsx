@@ -95,11 +95,30 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     useEffect(() => {
         if (status === "unauthenticated") {
             router.push("/login")
+            return
+        }
+        if (session?.user) {
+            const role = session.user.role
+            // 1. Admin-only routes
+            if (["/dashboard/manajemen-akun", "/dashboard/absensi-guru", "/dashboard/activity-log"].some(r => pathname.startsWith(r)) && role !== "admin") {
+                router.push("/dashboard")
+                return
+            }
+            // 2. Monitoring sekolah (Kepsek / Pengawas / Admin)
+            if (pathname.startsWith("/dashboard/kepala-sekolah") && role !== "kepsek" && role !== "pengawas" && role !== "admin") {
+                router.push("/dashboard")
+                return
+            }
+            // 3. Guru mapel restrictions
+            if (role === "guru_mapel" && ["/dashboard/siswa", "/dashboard/perpustakaan", "/dashboard/aset"].some(r => pathname.startsWith(r))) {
+                router.push("/dashboard")
+                return
+            }
         }
         if (session?.user?.kelas) {
             setCurrentKelas(session.user.kelas)
         }
-    }, [status, session, router])
+    }, [status, session, pathname, router])
 
     if (status === "loading") {
         return (
