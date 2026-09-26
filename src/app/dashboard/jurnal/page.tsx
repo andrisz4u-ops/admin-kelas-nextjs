@@ -2044,7 +2044,9 @@ function PrintPreviewModal({
             const fileSubject = isModePAI ? (activeMapel || "Mapel") : `Kelas_${kelas}`
             const fileName = printMode === "HARIAN"
                 ? `Agenda_Mengajar_${fileSubject}_${currentDate}.xlsx`
-                : `Agenda_Mengajar_${fileSubject}_${monthLabel}.xlsx`
+                : printMode === "MINGGUAN"
+                    ? `Agenda_Mengajar_${fileSubject}_Pekan_${currentDate}.xlsx`
+                    : `Agenda_Mengajar_${fileSubject}_${monthLabel}.xlsx`
             a.download = fileName
             document.body.appendChild(a)
             a.click()
@@ -2057,6 +2059,80 @@ function PrintPreviewModal({
             toast.error(err.message || "Gagal mengexport Excel", { id: "export-excel" })
         }
     }
+
+    // Kelompokkan data per hari untuk preview & cetak per lembar A4 Landscape
+    const dailySections = useMemo(() => {
+        if (printMode === "HARIAN") {
+            const sorted = allJurnal
+                .filter(item => getItemYMD(item.tanggal) === currentDate)
+                .sort((a, b) => parseJamKeOrder(a.jamKe) - parseJamKeOrder(b.jamKe))
+            const [y, m, d] = currentDate.split("-").map(Number)
+            const dt = new Date(y, m - 1, d)
+            return [{
+                ymd: currentDate,
+                dateObj: dt,
+                dayName: DAY_NAMES_ID[dt.getDay()] || "Senin",
+                fullDateText: dt.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }),
+                items: sorted
+            }]
+        }
+
+        const map = new Map<string, Jurnal[]>()
+        for (const item of printItems) {
+            const ymd = getItemYMD(item.tanggal)
+            if (!ymd) continue
+            if (!map.has(ymd)) map.set(ymd, [])
+            map.get(ymd)!.push(item)
+        }
+
+        if (printMode === "MINGGUAN") {
+            const [y, m, d] = currentDate.split("-").map(Number)
+            const dt = new Date(y, m - 1, d)
+            const dayOfWeek = dt.getDay()
+            const diffToMon = dayOfWeek === 0 ? -6 : 1 - dayOfWeek
+            const mon = new Date(dt)
+            mon.setDate(dt.getDate() + diffToMon)
+
+            const list = []
+            for (let offset = 0; offset < 5; offset++) {
+                const cur = new Date(mon)
+                cur.setDate(mon.getDate() + offset)
+                const ymd = getItemYMD(cur.toISOString())
+                const items = (map.get(ymd) || []).sort((a, b) => parseJamKeOrder(a.jamKe) - parseJamKeOrder(b.jamKe))
+
+                // Jika mode PAI dan tidak ada KBM pada hari itu, lewati
+                if (isModePAI && items.length === 0) continue
+
+                list.push({
+                    ymd,
+                    dateObj: cur,
+                    dayName: DAY_NAMES_ID[cur.getDay()] || "Senin",
+                    fullDateText: cur.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }),
+                    items
+                })
+            }
+            return list
+        }
+
+        // BULANAN: Urutkan tanggal, lewati akhir pekan (Sabtu & Minggu)
+        const uniqueYMDs = Array.from(map.keys()).sort()
+        const list = []
+        for (const ymd of uniqueYMDs) {
+            const [y, m, d] = ymd.split("-").map(Number)
+            const dt = new Date(y, m - 1, d)
+            if (dt.getDay() === 0 || dt.getDay() === 6) continue
+
+            const items = (map.get(ymd) || []).sort((a, b) => parseJamKeOrder(a.jamKe) - parseJamKeOrder(b.jamKe))
+            list.push({
+                ymd,
+                dateObj: dt,
+                dayName: DAY_NAMES_ID[dt.getDay()] || "Senin",
+                fullDateText: dt.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }),
+                items
+            })
+        }
+        return list
+    }, [printMode, allJurnal, currentDate, printItems, isModePAI])
 
     return (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex flex-col z-50 p-2 sm:p-4 overflow-y-auto">
@@ -2189,226 +2265,240 @@ function PrintPreviewModal({
                 </div>
             </div>
 
-            {/* Document Preview Canvas (FORMAT PERSIS GAMBAR USER) */}
-            <div className="flex-1 overflow-auto flex justify-center pb-8">
-                <div
-                    id="print-section"
-                    className="bg-white shadow-2xl p-6 sm:p-10 max-w-[1100px] w-full text-black font-sans print:p-0 print:shadow-none print:max-w-none"
-                    style={{ minHeight: "210mm" }}
-                >
-                    <style jsx global>{`
-                        @media print {
-                            @page {
-                                size: A4 landscape;
-                                margin: 8mm;
-                            }
+            {/* Document Preview Canvas (FORMAT PERSIS GAMBAR USER PER LEMBAR A4 LANDSCAPE) */}
+            <div className="flex-1 overflow-auto flex flex-col items-center pb-8 gap-8 print:gap-0 print:p-0">
+                <style jsx global>{`
+                    @media print {
+                        @page {
+                            size: A4 landscape;
+                            margin: 8mm;
                         }
-                    `}</style>
+                        .lembar-harian {
+                            page-break-after: always !important;
+                            break-after: page !important;
+                            margin-bottom: 0 !important;
+                            box-shadow: none !important;
+                            padding: 0 !important;
+                            max-width: none !important;
+                            min-height: auto !important;
+                        }
+                    }
+                `}</style>
 
-                    {/* JUDUL UTAMA */}
-                    <div className="text-center mb-6">
-                        <h1 className="text-lg sm:text-xl font-bold tracking-wide uppercase">
-                            AGENDA MENGAJAR GURU
-                        </h1>
-                        <h2 className="text-base sm:text-lg font-bold tracking-wide">
-                            (JURNAL HARIAN)
-                        </h2>
+                {dailySections.length === 0 ? (
+                    <div className="bg-white shadow-2xl p-10 max-w-[1100px] w-full text-center text-gray-500 italic rounded-xl border border-gray-200">
+                        Belum ada catatan agenda mengajar pada periode ini.
                     </div>
+                ) : (
+                    dailySections.map((sec, secIdx) => {
+                        const sItems = sec.items
+                        return (
+                            <div
+                                key={sec.ymd}
+                                id={`print-section-${secIdx}`}
+                                className="lembar-harian bg-white shadow-2xl p-6 sm:p-10 max-w-[1100px] w-full text-black font-sans print:shadow-none print:max-w-none print:p-0"
+                                style={{ minHeight: "210mm" }}
+                            >
+                                {/* JUDUL UTAMA */}
+                                <div className="text-center mb-6">
+                                    <h1 className="text-lg sm:text-xl font-bold tracking-wide uppercase">
+                                        AGENDA MENGAJAR GURU
+                                    </h1>
+                                    <h2 className="text-base sm:text-lg font-bold tracking-wide">
+                                        (JURNAL HARIAN)
+                                    </h2>
+                                </div>
 
-                    {/* IDENTITAS GURU & SEKOLAH */}
-                    <div className="text-xs sm:text-sm mb-4 space-y-1">
-                        <div className="flex">
-                            <span className="w-36 font-semibold">Nama Guru</span>
-                            <span>: {teacherName}</span>
-                        </div>
-                        <div className="flex">
-                            <span className="w-36 font-semibold">Nama Sekolah</span>
-                            <span>: {schoolName}</span>
-                        </div>
-                        <div className="flex">
-                            <span className="w-36 font-semibold">
-                                {isModePAI ? "Mata Pelajaran" : "Kelas"}
-                            </span>
-                            <span>: {isModePAI ? subjectName : `${getKelasWord(kelas)} (${toRoman(kelas)})`}</span>
-                        </div>
-                    </div>
+                                {/* IDENTITAS GURU & SEKOLAH */}
+                                <div className="text-xs sm:text-sm mb-4 space-y-1">
+                                    <div className="flex">
+                                        <span className="w-36 font-semibold">Nama Guru</span>
+                                        <span>: {teacherName}</span>
+                                    </div>
+                                    <div className="flex">
+                                        <span className="w-36 font-semibold">Nama Sekolah</span>
+                                        <span>: {schoolName}</span>
+                                    </div>
+                                    <div className="flex">
+                                        <span className="w-36 font-semibold">
+                                            {isModePAI ? "Mata Pelajaran" : "Kelas"}
+                                        </span>
+                                        <span>: {isModePAI ? subjectName : `${getKelasWord(kelas)} (${toRoman(kelas)})`}</span>
+                                    </div>
+                                </div>
 
-                    {/* SUB-HEADER: HARI/TGL ATAU PEKAN ATAU BULAN */}
-                    <div className="text-xs sm:text-sm font-bold uppercase mb-2">
-                        {printMode === "HARIAN" ? (
-                            <span>HARI / TANGGAL : {dayName.toUpperCase()}, {fullDateText.toUpperCase()}</span>
-                        ) : printMode === "MINGGUAN" ? (
-                            <span>PEKAN PEMBELAJARAN : SENIN, {weekInfo.monText.toUpperCase()} S.D. JUMAT, {weekInfo.friText.toUpperCase()}</span>
-                        ) : (
-                            <span>BULAN : {monthLabel}</span>
-                        )}
-                    </div>
+                                {/* SUB-HEADER: HARI / TANGGAL SESUAI LEMBAR INI */}
+                                <div className="text-xs sm:text-sm font-bold uppercase mb-2">
+                                    <span>HARI / TANGGAL : {sec.dayName.toUpperCase()}, {sec.fullDateText.toUpperCase()}</span>
+                                </div>
 
-                    {/* TABEL FORMAT GAMBAR (A4 EFISIEN) */}
-                    <table className="w-full border-collapse border border-black text-xs font-sans">
-                        <thead>
-                            <tr className="bg-[#dae3f3] text-black text-center font-bold">
-                                <th rowSpan={2} className="border border-black px-2 py-2 w-8">NO</th>
-                                {printMode !== "HARIAN" && (
-                                    <th rowSpan={2} className="border border-black px-2 py-2 w-28">HARI/TGL</th>
-                                )}
-                                <th rowSpan={2} className="border border-black px-2 py-2 w-20">JAM PELAJARAN</th>
-                                {isModePAI && (
-                                    <th rowSpan={2} className="border border-black px-2 py-2 w-12">KELAS</th>
-                                )}
-                                <th rowSpan={2} className="border border-black px-2.5 py-2 w-28 text-center">MATA PELAJARAN</th>
-                                <th rowSpan={2} className="border border-black px-3 py-2 text-center">MATERI AJAR</th>
-                                <th colSpan={3} className="border border-black px-2 py-1">KEHADIRAN SISWA</th>
-                                <th rowSpan={2} className="border border-black px-2 py-2 w-14">JML HADIR</th>
-                                <th rowSpan={2} className="border border-black px-2 py-2 w-14">JML TDK HADIR</th>
-                                <th rowSpan={2} className="border border-black px-2 py-2 w-44 text-center">KET</th>
-                                <th rowSpan={2} className="border border-black px-2 py-2 w-12">PARAF</th>
-                            </tr>
-                            <tr className="bg-[#dae3f3] text-black text-center font-bold">
-                                <th className="border border-black px-1.5 py-1 w-7">S</th>
-                                <th className="border border-black px-1.5 py-1 w-7">I</th>
-                                <th className="border border-black px-1.5 py-1 w-7">A</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {printItems.length === 0 ? (
-                                <tr>
-                                    <td colSpan={printMode === "HARIAN" ? (isModePAI ? 12 : 11) : (isModePAI ? 13 : 12)} className="border border-black text-center py-10 text-gray-500 italic">
-                                        Belum ada catatan agenda mengajar pada {printMode === "HARIAN" ? `${dayName}, ${fullDateText}` : `periode ini`}.
-                                    </td>
-                                </tr>
-                            ) : (
-                                <>
-                                    {printItems.map((item, index) => {
-                                        const s = item.jmlSakit || 0
-                                        const i = item.jmlIzin || 0
-                                        const a = item.jmlAlpha || 0
-                                        const tdkHadir = item.jmlTdkHadir !== undefined && item.jmlTdkHadir !== null ? item.jmlTdkHadir : (s + i + a)
-                                        const hadir = item.jmlHadir !== undefined && item.jmlHadir !== null ? item.jmlHadir : Math.max(0, totalSiswa - tdkHadir)
+                                {/* TABEL FORMAT RESMI */}
+                                <table className="w-full border-collapse border border-black text-xs font-sans">
+                                    <thead>
+                                        <tr className="bg-[#dae3f3] text-black text-center font-bold">
+                                            <th rowSpan={2} className="border border-black px-2 py-2 w-8">NO</th>
+                                            <th rowSpan={2} className="border border-black px-2 py-2 w-20">JAM PELAJARAN</th>
+                                            {isModePAI && (
+                                                <th rowSpan={2} className="border border-black px-2 py-2 w-12">KELAS</th>
+                                            )}
+                                            <th rowSpan={2} className="border border-black px-2.5 py-2 w-28 text-center">MATA PELAJARAN</th>
+                                            <th rowSpan={2} className="border border-black px-3 py-2 text-center">MATERI AJAR</th>
+                                            <th colSpan={3} className="border border-black px-2 py-1">KEHADIRAN SISWA</th>
+                                            <th rowSpan={2} className="border border-black px-2 py-2 w-14">JML HADIR</th>
+                                            <th rowSpan={2} className="border border-black px-2 py-2 w-14">JML TDK HADIR</th>
+                                            <th rowSpan={2} className="border border-black px-2 py-2 w-44 text-center">KET</th>
+                                            <th rowSpan={2} className="border border-black px-2 py-2 w-12">PARAF</th>
+                                        </tr>
+                                        <tr className="bg-[#dae3f3] text-black text-center font-bold">
+                                            <th className="border border-black px-1.5 py-1 w-7">S</th>
+                                            <th className="border border-black px-1.5 py-1 w-7">I</th>
+                                            <th className="border border-black px-1.5 py-1 w-7">A</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {sItems.length === 0 ? (
+                                            Array.from({ length: 6 }).map((_, emptyIdx) => (
+                                                <tr key={`empty-${emptyIdx}`} className="h-8">
+                                                    <td className="border border-black px-2 py-2 text-center text-gray-400">{emptyIdx + 1}</td>
+                                                    <td className="border border-black px-2 py-2 text-center"></td>
+                                                    {isModePAI && <td className="border border-black px-2 py-2 text-center"></td>}
+                                                    <td className="border border-black px-2.5 py-2 text-center"></td>
+                                                    <td className="border border-black px-3 py-2"></td>
+                                                    <td className="border border-black px-1 py-2 text-center"></td>
+                                                    <td className="border border-black px-1 py-2 text-center"></td>
+                                                    <td className="border border-black px-1 py-2 text-center"></td>
+                                                    <td className="border border-black px-2 py-2 text-center"></td>
+                                                    <td className="border border-black px-2 py-2 text-center"></td>
+                                                    <td className="border border-black px-2 py-2 text-center"></td>
+                                                    <td className="border border-black px-2 py-2 text-center"></td>
+                                                </tr>
+                                            ))
+                                        ) : (
+                                            <>
+                                                {sItems.map((item, index) => {
+                                                    const s = item.jmlSakit || 0
+                                                    const i = item.jmlIzin || 0
+                                                    const a = item.jmlAlpha || 0
+                                                    const tdkHadir = item.jmlTdkHadir !== undefined && item.jmlTdkHadir !== null ? item.jmlTdkHadir : (s + i + a)
+                                                    const hadir = item.jmlHadir !== undefined && item.jmlHadir !== null ? item.jmlHadir : Math.max(0, totalSiswa - tdkHadir)
 
-                                        return (
-                                            <tr key={item.id} className="align-middle">
-                                                <td className="border border-black px-2 py-2 text-center">{index + 1}</td>
-                                                {printMode !== "HARIAN" && (
-                                                    <td className="border border-black px-2 py-2 text-center whitespace-nowrap">
-                                                        {formatDateShort(item.tanggal)}
-                                                    </td>
-                                                )}
-                                                <td className="border border-black px-2 py-2 text-center font-semibold">
-                                                    {item.jamKe}
-                                                </td>
-                                                {isModePAI && (
-                                                    <td className="border border-black px-2 py-2 text-center font-bold">
-                                                        {toRoman(item.kelas || kelas)}
-                                                    </td>
-                                                )}
-                                                {/* KOLOM MATA PELAJARAN */}
-                                                <td className="border border-black px-2.5 py-2 text-center font-bold text-black leading-tight">
-                                                    {item.mapel}
-                                                </td>
-                                                {/* KOLOM MATERI AJAR */}
-                                                <td className="border border-black px-3 py-2 leading-snug">
-                                                    {item.materi}
-                                                </td>
-                                                <td className="border border-black px-1 py-2 text-center">
-                                                    {s > 0 ? s : ""}
-                                                </td>
-                                                <td className="border border-black px-1 py-2 text-center">
-                                                    {i > 0 ? i : ""}
-                                                </td>
-                                                <td className="border border-black px-1 py-2 text-center">
-                                                    {a > 0 ? a : ""}
-                                                </td>
-                                                <td className="border border-black px-2 py-2 text-center font-semibold">
-                                                    {hadir}
-                                                </td>
-                                                <td className="border border-black px-2 py-2 text-center font-semibold">
-                                                    {tdkHadir > 0 ? tdkHadir : ""}
-                                                </td>
-                                                {/* KOLOM KET: BERISI NAMA SISWA S/I/A SEBELUM PARAF */}
-                                                <td className="border border-black px-2 py-1.5 text-[11px] leading-tight">
-                                                    {item.siswaAbsen ? (
-                                                        <div>
-                                                            <div className="font-medium">{item.siswaAbsen}</div>
-                                                            {item.catatan && (
-                                                                <div className="text-[9.5px] text-gray-600 italic mt-0.5">
-                                                                    * {item.catatan}
-                                                                </div>
+                                                    return (
+                                                        <tr key={item.id} className="align-middle">
+                                                            <td className="border border-black px-2 py-2 text-center">{index + 1}</td>
+                                                            <td className="border border-black px-2 py-2 text-center font-semibold">
+                                                                {item.jamKe}
+                                                            </td>
+                                                            {isModePAI && (
+                                                                <td className="border border-black px-2 py-2 text-center font-bold">
+                                                                    {toRoman(item.kelas || kelas)}
+                                                                </td>
                                                             )}
-                                                        </div>
-                                                    ) : item.catatan ? (
-                                                        <div className="text-[10px] text-gray-700 italic">
-                                                            * {item.catatan}
-                                                        </div>
-                                                    ) : (
-                                                        <div className="text-center text-gray-400">-</div>
-                                                    )}
-                                                </td>
-                                                {/* PARAF */}
-                                                <td className="border border-black px-2 py-2 text-center font-bold">
-                                                    {item.paraf || "✓"}
-                                                </td>
-                                            </tr>
-                                        )
-                                    })}
+                                                            <td className="border border-black px-2.5 py-2 text-center font-bold text-black leading-tight">
+                                                                {item.mapel}
+                                                            </td>
+                                                            <td className="border border-black px-3 py-2 leading-snug">
+                                                                {item.materi}
+                                                            </td>
+                                                            <td className="border border-black px-1 py-2 text-center">
+                                                                {s > 0 ? s : ""}
+                                                            </td>
+                                                            <td className="border border-black px-1 py-2 text-center">
+                                                                {i > 0 ? i : ""}
+                                                            </td>
+                                                            <td className="border border-black px-1 py-2 text-center">
+                                                                {a > 0 ? a : ""}
+                                                            </td>
+                                                            <td className="border border-black px-2 py-2 text-center font-semibold">
+                                                                {hadir}
+                                                            </td>
+                                                            <td className="border border-black px-2 py-2 text-center font-semibold">
+                                                                {tdkHadir > 0 ? tdkHadir : ""}
+                                                            </td>
+                                                            <td className="border border-black px-2 py-1.5 text-[11px] leading-tight">
+                                                                {item.siswaAbsen ? (
+                                                                    <div>
+                                                                        <div className="font-medium">{item.siswaAbsen}</div>
+                                                                        {item.catatan && (
+                                                                            <div className="text-[9.5px] text-gray-600 italic mt-0.5">
+                                                                                * {item.catatan}
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                ) : item.catatan ? (
+                                                                    <div className="text-[10px] text-gray-700 italic">
+                                                                        * {item.catatan}
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="text-center text-gray-400">-</div>
+                                                                )}
+                                                            </td>
+                                                            <td className="border border-black px-2 py-2 text-center font-bold">
+                                                                {item.paraf || "✓"}
+                                                            </td>
+                                                        </tr>
+                                                    )
+                                                })}
 
-                                    {/* Baris Tambahan Kosong Bila Mode Harian Kurang dari 6 Baris */}
-                                    {printMode === "HARIAN" && printItems.length < 6 && (
-                                        Array.from({ length: 6 - printItems.length }).map((_, emptyIdx) => (
-                                            <tr key={`empty-${emptyIdx}`} className="h-8">
-                                                <td className="border border-black px-2 py-2 text-center text-gray-400">{printItems.length + emptyIdx + 1}</td>
-                                                <td className="border border-black px-2 py-2 text-center"></td>
-                                                {isModePAI && <td className="border border-black px-2 py-2 text-center"></td>}
-                                                <td className="border border-black px-2.5 py-2 text-center"></td>
-                                                <td className="border border-black px-3 py-2"></td>
-                                                <td className="border border-black px-1 py-2 text-center"></td>
-                                                <td className="border border-black px-1 py-2 text-center"></td>
-                                                <td className="border border-black px-1 py-2 text-center"></td>
-                                                <td className="border border-black px-2 py-2 text-center"></td>
-                                                <td className="border border-black px-2 py-2 text-center"></td>
-                                                <td className="border border-black px-2 py-2 text-center"></td>
-                                                <td className="border border-black px-2 py-2 text-center"></td>
-                                            </tr>
-                                        ))
-                                    )}
-                                </>
-                            )}
-                        </tbody>
-                    </table>
+                                                {/* Baris Tambahan Kosong Bila Kurang dari 6 Baris */}
+                                                {sItems.length < 6 && (
+                                                    Array.from({ length: 6 - sItems.length }).map((_, emptyIdx) => (
+                                                        <tr key={`empty-${emptyIdx}`} className="h-8">
+                                                            <td className="border border-black px-2 py-2 text-center text-gray-400">{sItems.length + emptyIdx + 1}</td>
+                                                            <td className="border border-black px-2 py-2 text-center"></td>
+                                                            {isModePAI && <td className="border border-black px-2 py-2 text-center"></td>}
+                                                            <td className="border border-black px-2.5 py-2 text-center"></td>
+                                                            <td className="border border-black px-3 py-2"></td>
+                                                            <td className="border border-black px-1 py-2 text-center"></td>
+                                                            <td className="border border-black px-1 py-2 text-center"></td>
+                                                            <td className="border border-black px-1 py-2 text-center"></td>
+                                                            <td className="border border-black px-2 py-2 text-center"></td>
+                                                            <td className="border border-black px-2 py-2 text-center"></td>
+                                                            <td className="border border-black px-2 py-2 text-center"></td>
+                                                            <td className="border border-black px-2 py-2 text-center"></td>
+                                                        </tr>
+                                                    ))
+                                                )}
+                                            </>
+                                        )}
+                                    </tbody>
+                                </table>
 
-                    {/* KOLOM TANDA TANGAN */}
-                    <div className="mt-8 pt-4 break-inside-avoid text-xs sm:text-sm">
-                        <div className="flex justify-between items-start">
-                            <div className="text-center w-72">
-                                <p className="mb-1">Mengetahui,</p>
-                                <p className="font-semibold">Kepala Sekolah</p>
-                                <div className="h-20"></div>
-                                <p className="font-bold underline uppercase">
-                                    {schoolSettings?.kepalaSekolah || "H. Ujang Ma'Mun, S.Pd.I."}
-                                </p>
-                                <p className="text-[11px] mt-0.5">
-                                    NIP. {schoolSettings?.nipKepsek || "196912122007011021"}
-                                </p>
+                                {/* KOLOM TANDA TANGAN LEMBAR INI */}
+                                <div className="mt-8 pt-4 break-inside-avoid text-xs sm:text-sm">
+                                    <div className="flex justify-between items-start">
+                                        <div className="text-center w-72">
+                                            <p className="mb-1">Mengetahui,</p>
+                                            <p className="font-semibold">Kepala Sekolah</p>
+                                            <div className="h-20"></div>
+                                            <p className="font-bold underline uppercase">
+                                                {schoolSettings?.kepalaSekolah || "H. Ujang Ma'Mun, S.Pd.I."}
+                                            </p>
+                                            <p className="text-[11px] mt-0.5">
+                                                NIP. {schoolSettings?.nipKepsek || "196912122007011021"}
+                                            </p>
+                                        </div>
+
+                                        <div className="text-center w-72">
+                                            <p className="mb-1">
+                                                Wanayasa, {sec.fullDateText}
+                                            </p>
+                                            <p className="font-semibold">
+                                                {isModePAI ? "Guru Mata Pelajaran PAI & BP" : `Guru Pengampu / Wali Kelas ${getKelasWord(kelas)} (${toRoman(kelas)})`}
+                                            </p>
+                                            <div className="h-20"></div>
+                                            <p className="font-bold underline uppercase">
+                                                {teacherName}
+                                            </p>
+                                            <p className="text-[11px] mt-0.5">
+                                                NIP. {isModePAI ? "196607101986102010" : (waliKelas?.nip && waliKelas.nip !== "-" ? waliKelas.nip : "-")}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
-
-                            <div className="text-center w-72">
-                                <p className="mb-1">
-                                    Wanayasa, {printMode === "HARIAN" ? fullDateText : printMode === "MINGGUAN" ? weekInfo.friText : new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}
-                                </p>
-                                <p className="font-semibold">
-                                    {isModePAI ? "Guru Mata Pelajaran PAI & BP" : `Guru Pengampu / Wali Kelas ${getKelasWord(kelas)} (${toRoman(kelas)})`}
-                                </p>
-                                <div className="h-20"></div>
-                                <p className="font-bold underline uppercase">
-                                    {teacherName}
-                                </p>
-                                <p className="text-[11px] mt-0.5">
-                                    NIP. {isModePAI ? "196607101986102010" : (waliKelas?.nip && waliKelas.nip !== "-" ? waliKelas.nip : "-")}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                        )
+                    })
+                )}
             </div>
         </div>
     )
