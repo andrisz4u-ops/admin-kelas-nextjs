@@ -12,13 +12,15 @@ export default function LoginPage() {
     const [loading, setLoading] = useState(false)
     const [username, setUsername] = useState("")
     const [password, setPassword] = useState("")
-    const [tahunAjaran, setTahunAjaran] = useState("2025/2026")
+    const [namaSekolah, setNamaSekolah] = useState("SDN 2 Nangerang")
+    const [tahunAjaran, setTahunAjaran] = useState("")
 
     useEffect(() => {
         fetch("/api/settings/school")
             .then(res => res.json())
             .then(data => {
                 if (data?.tahunAjaran) setTahunAjaran(data.tahunAjaran)
+                if (data?.namaSekolah) setNamaSekolah(data.namaSekolah)
             })
             .catch(() => {})
     }, [])
@@ -68,7 +70,7 @@ export default function LoginPage() {
                         />
                     </div>
                     <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Sistem Informasi Kelas</h1>
-                    <p className="text-sm text-gray-500 mt-1">SDN 2 Nangerang &bull; Masuk untuk mengelola data</p>
+                    <p className="text-sm text-gray-500 mt-1">{namaSekolah} &bull; Masuk untuk mengelola data</p>
                 </div>
 
                 {/* Form Card */}
@@ -120,9 +122,11 @@ export default function LoginPage() {
                 </div>
 
                 {/* Footer */}
-                <p className="text-center text-gray-400 text-sm mt-6">
-                    Tahun Ajaran {tahunAjaran}
-                </p>
+                {tahunAjaran && (
+                    <p className="text-center text-gray-400 text-sm mt-6">
+                        Tahun Ajaran {tahunAjaran}
+                    </p>
+                )}
             </div>
         </div>
     )

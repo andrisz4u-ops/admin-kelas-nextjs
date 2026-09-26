@@ -42,6 +42,11 @@ export async function middleware(request: NextRequest) {
             }
         }
 
+        // Allow public GET for school settings (login page branding & academic year)
+        if (pathname === "/api/settings/school" && request.method === "GET") {
+            return NextResponse.next()
+        }
+
         // 3. Protected API routes: if not authenticated -> return 401 JSON
         if (pathname.startsWith("/api/")) {
             if (!token) {
