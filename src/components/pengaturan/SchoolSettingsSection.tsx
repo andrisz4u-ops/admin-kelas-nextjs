@@ -24,6 +24,19 @@ export function SchoolSettingsSection({
     saving,
     setSaving,
 }: SchoolSettingsSectionProps) {
+    const academicYearOptions = React.useMemo(() => {
+        const currentYear = new Date().getFullYear()
+        const years: string[] = []
+        for (let y = currentYear - 3; y <= currentYear + 4; y++) {
+            years.push(`${y}/${y + 1}`)
+        }
+        if (school.tahunAjaran && !years.includes(school.tahunAjaran.trim())) {
+            years.push(school.tahunAjaran.trim())
+            years.sort()
+        }
+        return years
+    }, [school.tahunAjaran])
+
     const handleSaveSchool = async () => {
         if (!isAdmin) return
 
@@ -76,11 +89,32 @@ export function SchoolSettingsSection({
                                 value={school.namaSekolah}
                                 onChange={(v) => setSchool({ ...school, namaSekolah: v })}
                             />
-                            <Field
-                                label="Tahun Ajaran"
-                                value={school.tahunAjaran}
-                                onChange={(v) => setSchool({ ...school, tahunAjaran: v })}
-                            />
+                            <div>
+                                <label className="block text-sm font-medium text-[var(--foreground)] mb-2">
+                                    Tahun Ajaran
+                                </label>
+                                <div className="relative">
+                                    <select
+                                        value={school.tahunAjaran || "2026/2027"}
+                                        onChange={(e) => setSchool({ ...school, tahunAjaran: e.target.value })}
+                                        className="w-full px-4 py-2.5 bg-white border border-[var(--border)] rounded-lg text-sm outline-none focus:ring-1 focus:ring-black cursor-pointer appearance-none font-medium text-[var(--foreground)]"
+                                    >
+                                        {academicYearOptions.map((yr) => (
+                                            <option key={yr} value={yr}>
+                                                {yr}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[var(--accents-5)]">
+                                        <svg width="10" height="6" viewBox="0 0 10 6" fill="none">
+                                            <path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                                        </svg>
+                                    </div>
+                                </div>
+                                <p className="text-[11px] text-[var(--accents-5)] mt-1">
+                                    Tahun ajaran aktif yang menjadi acuan utama seluruh data sekolah
+                                </p>
+                            </div>
                             <div>
                                 <label className="block text-sm font-medium text-[var(--foreground)] mb-2">
                                     Semester Aktif Berjalan
