@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma"
 import { Prisma } from "@prisma/client"
+import { getDefaultAcademicYear } from "@/lib/academicYear"
 
 export interface NilaiEntry {
     siswaId: string
@@ -25,7 +26,7 @@ export const nilaiService = {
         let tahunAjaran = tahunAjaranParam
         if (!tahunAjaran) {
             const settings = await prisma.schoolSettings.findFirst()
-            tahunAjaran = settings?.tahunAjaran || "2026/2027"
+            tahunAjaran = settings?.tahunAjaran || getDefaultAcademicYear()
         }
 
         return prisma.nilai.findMany({

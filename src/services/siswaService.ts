@@ -237,11 +237,11 @@ export const siswaService = {
                 })
             }
 
-            // 5. Update tahun ajaran di master setting
+            // 5. Update tahun ajaran di master setting dan reset semester ke 1 (Ganjil)
             await tx.schoolSettings.upsert({
                 where: { id: "main" },
-                update: { tahunAjaran: tahunAjaranBaru },
-                create: { id: "main", tahunAjaran: tahunAjaranBaru },
+                update: { tahunAjaran: tahunAjaranBaru, semesterAktif: 1 },
+                create: { id: "main", tahunAjaran: tahunAjaranBaru, semesterAktif: 1 },
             })
 
             // 6. Catat ActivityLog

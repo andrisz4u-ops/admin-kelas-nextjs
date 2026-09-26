@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 import { nilaiService } from "@/services/nilaiService"
+import { getDefaultAcademicYear } from "@/lib/academicYear"
 
 export const dynamic = "force-dynamic"
 
@@ -67,7 +68,7 @@ export async function POST(request: NextRequest) {
         let defaultTahunAjaran = bodyTahunAjaran
         if (!defaultTahunAjaran) {
             const settings = await prisma.schoolSettings.findFirst()
-            defaultTahunAjaran = settings?.tahunAjaran || "2026/2027"
+            defaultTahunAjaran = settings?.tahunAjaran || getDefaultAcademicYear()
         }
 
         const targetKelas = bodyKelas ? parseInt(String(bodyKelas)) : (entries[0]?.kelas ? parseInt(String(entries[0].kelas)) : (userKelas || 1))

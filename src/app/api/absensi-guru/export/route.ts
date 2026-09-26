@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
-import { SCHOOL_CALENDAR_2025_2026 } from "@/lib/schoolCalendar"
+import { getCalendar } from "@/lib/schoolCalendar"
+import { getDefaultAcademicYear } from "@/lib/academicYear"
 import ExcelJS from "exceljs"
 import fs from "fs"
 import path from "path"
@@ -30,6 +31,29 @@ export async function POST(request: NextRequest) {
             prisma.schoolSettings.findUnique({ where: { id: "main" } }),
             prisma.waliKelas.findMany()
         ])
+
+        const currentTahunAjaran = schoolSettings?.tahunAjaran || getDefaultAcademicYear()
+        const dbHolidayEvents = await prisma.kalenderEvent.findMany({
+            where: {
+                tahunAjaran: currentTahunAjaran,
+                OR: [{ isLibur: true }, { tipe: "holiday" }],
+            },
+        })
+
+        const holidaySet = new Set<string>()
+        const staticCalendar = getCalendar(currentTahunAjaran)
+        staticCalendar.holidays.forEach(h => holidaySet.add(h))
+        dbHolidayEvents.forEach(ev => {
+            const cur = new Date(ev.tanggalMulai)
+            const stop = ev.tanggalSelesai ? new Date(ev.tanggalSelesai) : new Date(ev.tanggalMulai)
+            while (cur <= stop) {
+                const y = cur.getFullYear()
+                const m = String(cur.getMonth() + 1).padStart(2, '0')
+                const d = String(cur.getDate()).padStart(2, '0')
+                holidaySet.add(`${y}-${m}-${d}`)
+                cur.setDate(cur.getDate() + 1)
+            }
+        })
 
         const kepsekUser = teachersRaw.find(t => t.role === "kepsek")
         const kepsekName = schoolSettings?.kepalaSekolah || kepsekUser?.name || "Kepala Sekolah"
@@ -316,7 +340,7 @@ export async function POST(request: NextRequest) {
                 const d = String(current.getDate()).padStart(2, '0')
                 const dateStr = `${y}-${m}-${d}`
 
-                const isHoliday = SCHOOL_CALENDAR_2025_2026.holidays.includes(dateStr)
+                const isHoliday = holidaySet.has(dateStr)
 
                 if (day !== 0 && day !== 6 && !isHoliday) { // Skip Sunday & Saturday AND Holidays
                     createDailySheet(new Date(current), attendance)
@@ -408,7 +432,7 @@ export async function POST(request: NextRequest) {
                     const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`
                     const dateObj = new Date(year, month - 1, day)
                     const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6
-                    isHoliday = isWeekend || SCHOOL_CALENDAR_2025_2026.holidays.includes(dateStr)
+                    isHoliday = isWeekend || holidaySet.has(dateStr)
                 }
 
                 if (isHoliday) {
@@ -463,7 +487,7 @@ export async function POST(request: NextRequest) {
                         const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`
                         const dateObj = new Date(year, month - 1, day)
                         const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6
-                        const isHoliday = isWeekend || SCHOOL_CALENDAR_2025_2026.holidays.includes(dateStr)
+                        const isHoliday = isWeekend || holidaySet.has(dateStr)
 
                         if (isHoliday) {
                             cell.fill = {

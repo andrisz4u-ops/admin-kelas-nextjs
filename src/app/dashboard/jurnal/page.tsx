@@ -213,7 +213,7 @@ export default function JurnalPage() {
 
     const [jurnal, setJurnal] = useState<Jurnal[]>([])
     const [schedule, setSchedule] = useState<JadwalPelajaranItem[]>([])
-    const [totalSiswa, setTotalSiswa] = useState<number>(27)
+    const [totalSiswa, setTotalSiswa] = useState<number>(0)
     const [loading, setLoading] = useState(true)
     const [syncing, setSyncing] = useState(false)
 
@@ -475,7 +475,7 @@ export default function JurnalPage() {
     // Current Teacher Display
     const currentWali = waliKelasList.find(w => w.kelas === currentKelas)
     const teacherName = isModePAI
-        ? (isGuruMapel ? (session?.user?.name || "Guru Mata Pelajaran") : (activeMapel === "PAI" ? "Kuraesin, S.Pd.I" : (session?.user?.name || "Guru Mata Pelajaran")))
+        ? (isGuruMapel ? (session?.user?.name || "Guru Mata Pelajaran") : (session?.user?.name || (activeMapel ? `Guru ${activeMapel}` : "Guru Mata Pelajaran")))
         : (currentWali?.nama || session?.user?.name || "Guru Kelas")
     const subjectDisplayName = isModePAI
         ? (activeMapel === "PAI"

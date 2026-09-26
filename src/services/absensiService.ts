@@ -300,7 +300,8 @@ export const absensiService = {
             })
 
             const totalRecorded = counts.H + counts.S + counts.I + counts.A
-            const percentage = totalSchoolDays > 0 ? Math.round((counts.H / totalSchoolDays) * 100) : 0
+            const baseDays = Math.max(Math.min(recordedDates.size, totalSchoolDays), totalRecorded)
+            const percentage = baseDays > 0 ? Math.min(100, Math.round((counts.H / baseDays) * 100)) : 0
 
             return {
                 id: student.id,

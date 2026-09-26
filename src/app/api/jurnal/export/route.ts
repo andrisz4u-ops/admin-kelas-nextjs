@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import ExcelJS from "exceljs"
 import { isHoliday, isWeekend } from "@/lib/schoolCalendar"
 import { prisma } from "@/lib/prisma"
+import { getServerSession } from "next-auth"
+import { authOptions } from "@/lib/auth"
 
 const DAY_NAMES_ID = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"]
 const MONTH_NAMES_SHORT = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"]
@@ -450,20 +452,26 @@ function renderDailyWorksheet(
 
 export async function POST(req: NextRequest) {
     try {
+        let session = null
+        try {
+            session = await getServerSession(authOptions)
+        } catch {
+            session = null
+        }
         const body = await req.json()
         const {
             printItems = [],
             printMode = "HARIAN",
-            kelas = 5,
+            kelas: bodyKelas,
             isModePAI = false,
             subjectName = "",
-            teacherName = "Andris Hadiansyah, S.Pd",
-            schoolName = "SDN 2 Nangerang",
+            teacherName: bodyTeacherName,
+            schoolName = "",
             currentDate = "",
             selectedMonth = "ALL",
-            totalSiswa = 27,
+            totalSiswa: bodyTotalSiswa,
             schoolSettings = null,
-            waliKelas = null
+            waliKelas: bodyWaliKelas
         } = body
 
         if (!Array.isArray(printItems) || printItems.length === 0) {
@@ -476,6 +484,31 @@ export async function POST(req: NextRequest) {
                 currentSchoolSettings = await prisma.schoolSettings.findFirst()
             } catch {
                 currentSchoolSettings = null
+            }
+        }
+
+        const kelas = Number(bodyKelas) || session?.user?.kelas || 1
+
+        let waliKelas = bodyWaliKelas
+        if (!waliKelas && kelas) {
+            try {
+                waliKelas = await prisma.waliKelas.findUnique({ where: { kelas } })
+            } catch {
+                waliKelas = null
+            }
+        }
+
+        let teacherName = bodyTeacherName
+        if (!teacherName) {
+            teacherName = session?.user?.name || waliKelas?.nama || "Guru Pengampu"
+        }
+
+        let totalSiswa = bodyTotalSiswa
+        if (!totalSiswa || totalSiswa === 0) {
+            try {
+                totalSiswa = await prisma.siswa.count({ where: { kelas, status: "aktif" } })
+            } catch {
+                totalSiswa = 0
             }
         }
 
@@ -530,7 +563,7 @@ export async function POST(req: NextRequest) {
                 const hasItems = itemsByDate.has(ymd) && itemsByDate.get(ymd)!.length > 0
 
                 // Lewati jika libur nasional/sekolah dan tidak ada catatan KBM
-                if (!hasItems && isHoliday(cur)) {
+                if (!hasItems && isHoliday(cur, currentSchoolSettings?.tahunAjaran)) {
                     continue
                 }
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
+import { getDefaultAcademicYear } from "@/lib/academicYear"
 
 export const dynamic = 'force-dynamic'
 
@@ -23,23 +24,38 @@ export async function GET(request: NextRequest) {
         let tahunAjaran = tahunAjaranParam
         if (!tahunAjaran) {
             const settings = await prisma.schoolSettings.findFirst()
-            tahunAjaran = settings?.tahunAjaran || "2026/2027"
+            tahunAjaran = settings?.tahunAjaran || getDefaultAcademicYear()
         }
 
-        // Get all active students in class
-        const students = await prisma.siswa.findMany({
-            where: { kelas, status: "aktif" },
-            orderBy: { nama: "asc" },
-            select: { id: true, nis: true, nama: true }
+        // Ambil data siswa: prioritaskan RiwayatKelas untuk tahun ajaran terkait, fallback ke Siswa aktif
+        const riwayat = await prisma.riwayatKelas.findMany({
+            where: { kelas, tahunAjaran },
+            include: {
+                siswa: { select: { id: true, nis: true, nama: true } },
+            },
+            orderBy: { siswa: { nama: "asc" } },
         })
 
-        // Get all grades for active students in the class filtered by semester, kelas, and tahunAjaran
+        let students: { id: string; nis: string; nama: string }[] = []
+        if (riwayat.length > 0) {
+            students = riwayat.map((r) => r.siswa)
+        } else {
+            students = await prisma.siswa.findMany({
+                where: { kelas, status: "aktif" },
+                orderBy: { nama: "asc" },
+                select: { id: true, nis: true, nama: true }
+            })
+        }
+
+        const studentIds = students.map((s) => s.id)
+
+        // Ambil seluruh nilai siswa yang terdaftar pada kelas dan tahun ajaran tersebut
         const grades = await prisma.nilai.findMany({
             where: {
-                siswa: { kelas, status: "aktif" },
                 kelas,
                 tahunAjaran,
                 semester,
+                siswaId: { in: studentIds },
             },
             include: { siswa: { select: { id: true, nama: true } } }
         })

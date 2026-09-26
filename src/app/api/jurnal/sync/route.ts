@@ -24,10 +24,13 @@ export async function POST(request: NextRequest) {
         const queryDateStart = new Date(Date.UTC(y, m - 1, d, 0, 0, 0, 0))
         const queryDateEnd = new Date(Date.UTC(y, m - 1, d, 23, 59, 59, 999))
 
-        // Ambil data absensi siswa aktif pada tanggal dan kelas tersebut
+        // Ambil data absensi siswa pada tanggal dan kelas tersebut
         const absensiList = await prisma.absensi.findMany({
             where: {
-                siswa: { kelas: kelasNum, status: "aktif" },
+                OR: [
+                    { kelas: kelasNum },
+                    { siswa: { kelas: kelasNum } },
+                ],
                 tanggal: {
                     gte: queryDateStart,
                     lte: queryDateEnd,
@@ -46,7 +49,10 @@ export async function POST(request: NextRequest) {
         const i = iNames.length
         const a = aNames.length
         const tdkHadir = s + i + a
-        const totalSiswa = await prisma.siswa.count({ where: { kelas: kelasNum, status: "aktif" } })
+        let totalSiswa = await prisma.siswa.count({ where: { kelas: kelasNum, status: "aktif" } })
+        if (totalSiswa === 0 && absensiList.length > 0) {
+            totalSiswa = absensiList.length
+        }
         const hadir = Math.max(0, totalSiswa - tdkHadir)
 
         const parts: string[] = []

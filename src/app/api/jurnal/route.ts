@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { parseToUTCMidnight } from "@/lib/dateUtils"
+import { getDefaultAcademicYear } from "@/lib/academicYear"
 
 export const dynamic = 'force-dynamic'
 
@@ -34,8 +35,8 @@ export async function GET(request: NextRequest) {
         const whereClause: any = {}
         if (kelasParam && kelasParam !== "ALL") {
             whereClause.kelas = parseInt(kelasParam)
-        } else if (!kelasParam) {
-            whereClause.kelas = 5
+        } else if (!kelasParam && session?.user?.kelas) {
+            whereClause.kelas = session.user.kelas
         }
         if (mapelParam) {
             whereClause.mapel = { contains: mapelParam, mode: "insensitive" }
@@ -78,7 +79,7 @@ export async function POST(request: NextRequest) {
 
         // Resolve default tahunAjaran from school settings
         const settings = await prisma.schoolSettings.findFirst()
-        const defaultTahunAjaran = settings?.tahunAjaran || "2026/2027"
+        const defaultTahunAjaran = settings?.tahunAjaran || getDefaultAcademicYear()
         const defaultSemester = settings?.semesterAktif || 1
 
         const body = await request.json()

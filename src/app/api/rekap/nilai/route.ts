@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { getMapelByKelas } from "@/lib/mapelConfig"
+import { getDefaultAcademicYear } from "@/lib/academicYear"
 
 export const dynamic = 'force-dynamic'
 
@@ -26,22 +27,38 @@ export async function GET(request: NextRequest) {
         let tahunAjaran = tahunAjaranParam
         if (!tahunAjaran) {
             const settings = await prisma.schoolSettings.findFirst()
-            tahunAjaran = settings?.tahunAjaran || "2026/2027"
+            tahunAjaran = settings?.tahunAjaran || getDefaultAcademicYear()
         }
 
-        // Get all active students in the class
-        const students = await prisma.siswa.findMany({
-            where: { kelas, status: "aktif" },
-            orderBy: { nama: "asc" },
-            select: { id: true, nis: true, nama: true },
+        // Ambil data siswa: Prioritaskan RiwayatKelas untuk tahun ajaran yang dipilih,
+        // jika belum ada snapshot riwayat (misal tahun berjalan), gunakan Siswa aktif
+        const riwayat = await prisma.riwayatKelas.findMany({
+            where: { kelas, tahunAjaran },
+            include: {
+                siswa: { select: { id: true, nis: true, nama: true } },
+            },
+            orderBy: { siswa: { nama: "asc" } },
         })
 
-        // Get all nilai for active students in the class filtered by semester, kelas, and tahunAjaran
+        let students: { id: string; nis: string; nama: string }[] = []
+        if (riwayat.length > 0) {
+            students = riwayat.map((r) => r.siswa)
+        } else {
+            students = await prisma.siswa.findMany({
+                where: { kelas, status: "aktif" },
+                orderBy: { nama: "asc" },
+                select: { id: true, nis: true, nama: true },
+            })
+        }
+
+        const studentIds = students.map((s) => s.id)
+
+        // Query nilai berdasarkan kelas, tahunAjaran, semester, dan ID siswa terkait
         const whereClause: any = {
-            siswa: { kelas, status: "aktif" },
             kelas,
             tahunAjaran,
             semester,
+            siswaId: { in: studentIds },
         }
         if (mapel) {
             whereClause.mapel = mapel
