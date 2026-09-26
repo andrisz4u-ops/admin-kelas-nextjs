@@ -4,6 +4,7 @@ import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { useState, useEffect } from "react"
+import { getDefaultAcademicYear } from "@/lib/academicYear"
 
 export const dynamic = 'force-dynamic'
 
@@ -163,7 +164,7 @@ export default function DashboardPage() {
                         Selamat Datang, {welcomeName?.split(' ')[0]}! 👋
                     </h1>
                     <p className="text-sm sm:text-base text-[var(--accents-5)] mt-1">
-                        {schoolInfo?.namaSekolah || "SDN 2 Nangerang"} • Tahun Ajaran {schoolInfo?.tahunAjaran || "2025/2026"}
+                        {schoolInfo?.namaSekolah || "SDN 2 Nangerang"} • Tahun Ajaran {schoolInfo?.tahunAjaran || getDefaultAcademicYear()}
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -387,7 +388,7 @@ export default function DashboardPage() {
                         </div>
                         <div className="flex-1 min-w-0">
                             <p className="text-[10px] font-semibold text-[var(--accents-5)] uppercase tracking-wider">Tahun Ajaran</p>
-                            <p className="text-sm font-medium text-[var(--foreground)] truncate">{schoolInfo?.tahunAjaran || "2025/2026"}</p>
+                            <p className="text-sm font-medium text-[var(--foreground)] truncate">{schoolInfo?.tahunAjaran || getDefaultAcademicYear()}</p>
                         </div>
                     </div>
                 </div>

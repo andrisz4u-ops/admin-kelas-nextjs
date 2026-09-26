@@ -1,18 +1,8 @@
 import { prisma } from "@/lib/prisma"
 import { Prisma } from "@prisma/client"
+import { getDefaultAcademicYear, hitungTahunAjaranBaru } from "@/lib/academicYear"
 
-export function hitungTahunAjaranBaru(tahunSekarang: string): string {
-    const parts = tahunSekarang.split("/")
-    if (parts.length === 2) {
-        const awal = parseInt(parts[0], 10)
-        const akhir = parseInt(parts[1], 10)
-        if (!isNaN(awal) && !isNaN(akhir)) {
-            return `${awal + 1}/${akhir + 1}`
-        }
-    }
-    const tahunDepan = new Date().getFullYear() + 1
-    return `${tahunDepan}/${tahunDepan + 1}`
-}
+export { hitungTahunAjaranBaru }
 
 export const siswaService = {
     // Ambil daftar siswa dengan filter kelas, status, search, dan pagination
@@ -167,7 +157,7 @@ export const siswaService = {
     // Proses Kenaikan Kelas & Riwayat Kelas Snapshot
     async prosesKenaikanKelas(tahunAjaranBaru: string, userId?: string) {
         const settings = await prisma.schoolSettings.findFirst()
-        const tahunAjaranSekarang = settings?.tahunAjaran || "2025/2026"
+        const tahunAjaranSekarang = settings?.tahunAjaran || getDefaultAcademicYear()
 
         return prisma.$transaction(async (tx) => {
             const countsBefore = await tx.siswa.groupBy({

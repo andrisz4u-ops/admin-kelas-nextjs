@@ -1,9 +1,10 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { useSession } from "next-auth/react"
 import toast from "react-hot-toast"
 import * as XLSX from "xlsx"
+import { getAcademicYearOptions } from "@/lib/academicYear"
 
 interface NilaiByMapel {
     [mapel: string]: { [jenis: string]: number }
@@ -48,6 +49,8 @@ export default function RekapNilaiPage() {
     const [tahunAjaran, setTahunAjaran] = useState("2026/2027")
     const [selectedMapel, setSelectedMapel] = useState("")
     const [viewMode, setViewMode] = useState<"summary" | "detail">("summary")
+
+    const yearOptions = useMemo(() => getAcademicYearOptions(tahunAjaran), [tahunAjaran])
 
     useEffect(() => {
         if (typeof window !== "undefined") {
@@ -192,10 +195,9 @@ export default function RekapNilaiPage() {
                             onChange={(e) => setTahunAjaran(e.target.value)}
                             className="h-9 pl-3 pr-8 bg-white border border-[var(--border)] rounded-md text-sm text-[var(--foreground)] outline-none focus:ring-1 focus:ring-black cursor-pointer appearance-none font-medium"
                         >
-                            <option value="2024/2025">TP 2024/2025</option>
-                            <option value="2025/2026">TP 2025/2026</option>
-                            <option value="2026/2027">TP 2026/2027</option>
-                            <option value="2027/2028">TP 2027/2028</option>
+                            {yearOptions.map((y) => (
+                                <option key={y} value={y}>TP {y}</option>
+                            ))}
                         </select>
                         <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[var(--accents-5)]">
                             <svg width="10" height="6" viewBox="0 0 10 6" fill="none"><path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>

@@ -2,14 +2,28 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
+import { getDefaultAcademicYear } from "@/lib/academicYear"
 
 export async function GET() {
     try {
         const settings = await prisma.schoolSettings.findFirst()
-        return NextResponse.json(settings || {
-            namaSekolah: "SDN 2 Nangerang",
-            tahunAjaran: "2025/2026",
-            semesterAktif: 1
+        const defaultYear = getDefaultAcademicYear()
+
+        let kepsekUser: { name: string; nip: string | null } | null = null
+        if (!settings?.kepalaSekolah || !settings?.nipKepsek) {
+            kepsekUser = await prisma.user.findFirst({
+                where: { role: "kepsek" },
+                select: { name: true, nip: true }
+            })
+        }
+
+        return NextResponse.json({
+            id: settings?.id || "main",
+            namaSekolah: settings?.namaSekolah || "SDN 2 Nangerang",
+            kepalaSekolah: settings?.kepalaSekolah || kepsekUser?.name || "",
+            nipKepsek: settings?.nipKepsek || kepsekUser?.nip || "",
+            tahunAjaran: settings?.tahunAjaran || defaultYear,
+            semesterAktif: settings?.semesterAktif || 1
         })
     } catch (error) {
         console.error("Error:", error)

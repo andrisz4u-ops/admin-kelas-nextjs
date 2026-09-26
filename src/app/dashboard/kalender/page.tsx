@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react"
 import { useSession } from "next-auth/react"
 import toast from "react-hot-toast"
+import { getAcademicYearOptions, getDefaultAcademicYear } from "@/lib/academicYear"
 
 interface KalenderEvent {
     id: string
@@ -40,8 +41,8 @@ export default function KalenderAkademikPage() {
     const [currentMonth, setCurrentMonth] = useState(today.getMonth())
     const [currentYear, setCurrentYear] = useState(today.getFullYear())
     const [selectedDate, setSelectedDate] = useState<string | null>(null)
-    const [tahunAjaran, setTahunAjaran] = useState("2026/2027")
-    const [availableYears, setAvailableYears] = useState<string[]>(["2025/2026", "2026/2027"])
+    const [tahunAjaran, setTahunAjaran] = useState(getDefaultAcademicYear())
+    const [availableYears, setAvailableYears] = useState<string[]>(getAcademicYearOptions())
 
     // Data state
     const [config, setConfig] = useState<KalenderConfig | null>(null)

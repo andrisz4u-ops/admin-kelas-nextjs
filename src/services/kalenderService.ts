@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma"
+import { getAcademicYearOptions, getDefaultAcademicYear } from "@/lib/academicYear"
 
 // Helper: format Date to "YYYY-MM-DD"
 function formatDateStr(date: Date): string {
@@ -27,7 +28,7 @@ export const kalenderService = {
         let tahunAjaran = tahunAjaranParam
         if (!tahunAjaran) {
             const schoolSettings = await prisma.schoolSettings.findFirst()
-            tahunAjaran = schoolSettings?.tahunAjaran || "2026/2027"
+            tahunAjaran = schoolSettings?.tahunAjaran || getDefaultAcademicYear()
         }
 
         const [config, events, configsAll, eventsAll] = await Promise.all([
@@ -47,12 +48,9 @@ export const kalenderService = {
             }),
         ])
 
-        const yearSet = new Set<string>()
+        const yearSet = new Set<string>(getAcademicYearOptions(tahunAjaran))
         configsAll.forEach((c) => yearSet.add(c.tahunAjaran))
         eventsAll.forEach((e) => yearSet.add(e.tahunAjaran))
-        yearSet.add("2025/2026")
-        yearSet.add("2026/2027")
-        if (tahunAjaran) yearSet.add(tahunAjaran)
         const availableYears = Array.from(yearSet).sort()
 
         const holidaySet = new Set<string>()

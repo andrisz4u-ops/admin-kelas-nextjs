@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import ExcelJS from "exceljs"
 import { isHoliday, isWeekend } from "@/lib/schoolCalendar"
+import { prisma } from "@/lib/prisma"
 
 const DAY_NAMES_ID = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"]
 const MONTH_NAMES_SHORT = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"]
@@ -369,8 +370,8 @@ function renderDailyWorksheet(
     ws.getCell(sig2R, 1).alignment = { horizontal: "center", vertical: "middle" }
     ws.getCell(sig2R, 1).font = { name: "Arial", size: 10, bold: true }
 
-    const kepsekName = schoolSettings?.kepalaSekolah || "H. Ujang Ma'Mun, S.Pd.I."
-    const kepsekNip = schoolSettings?.nipKepsek ? `NIP. ${schoolSettings.nipKepsek}` : "NIP. 196912122007011021"
+    const kepsekName = schoolSettings?.kepalaSekolah || "-"
+    const kepsekNip = schoolSettings?.nipKepsek ? `NIP. ${schoolSettings.nipKepsek}` : "-"
 
     ws.mergeCells(sigNameR, 1, sigNameR, 4)
     ws.getCell(sigNameR, 1).value = kepsekName.toUpperCase()
@@ -395,7 +396,7 @@ function renderDailyWorksheet(
     ws.getCell(sig2R, rightStartCol).alignment = { horizontal: "center", vertical: "middle" }
     ws.getCell(sig2R, rightStartCol).font = { name: "Arial", size: 10, bold: true }
 
-    const guruNip = isModePAI ? "NIP. 196607101986102010" : (waliKelas?.nip && waliKelas.nip !== "-" ? `NIP. ${waliKelas.nip}` : "NIP. -")
+    const guruNip = waliKelas?.nip && waliKelas.nip !== "-" ? `NIP. ${waliKelas.nip}` : "NIP. -"
 
     ws.mergeCells(sigNameR, rightStartCol, sigNameR, rightEndCol)
     ws.getCell(sigNameR, rightStartCol).value = teacherName.toUpperCase()
@@ -469,6 +470,15 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Tidak ada data untuk diexport" }, { status: 400 })
         }
 
+        let currentSchoolSettings = schoolSettings
+        if (!currentSchoolSettings) {
+            try {
+                currentSchoolSettings = await prisma.schoolSettings.findFirst()
+            } catch {
+                currentSchoolSettings = null
+            }
+        }
+
         const wb = new ExcelJS.Workbook()
         wb.creator = "Administrasi Guru SD"
 
@@ -476,10 +486,10 @@ export async function POST(req: NextRequest) {
             kelas,
             isModePAI,
             subjectName,
-            teacherName,
-            schoolName,
+            teacherName: teacherName || waliKelas?.nama || "Guru Pengampu",
+            schoolName: schoolName || currentSchoolSettings?.namaSekolah || "Sekolah",
             totalSiswa,
-            schoolSettings,
+            schoolSettings: currentSchoolSettings,
             waliKelas
         }
 

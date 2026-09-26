@@ -3,6 +3,7 @@
 import React from "react"
 import toast from "react-hot-toast"
 import { SchoolSettings } from "./types"
+import { getAcademicYearOptions } from "@/lib/academicYear"
 import { Chevron, Field } from "./SharedUI"
 
 interface SchoolSettingsSectionProps {
@@ -25,16 +26,7 @@ export function SchoolSettingsSection({
     setSaving,
 }: SchoolSettingsSectionProps) {
     const academicYearOptions = React.useMemo(() => {
-        const currentYear = new Date().getFullYear()
-        const years: string[] = []
-        for (let y = currentYear - 3; y <= currentYear + 4; y++) {
-            years.push(`${y}/${y + 1}`)
-        }
-        if (school.tahunAjaran && !years.includes(school.tahunAjaran.trim())) {
-            years.push(school.tahunAjaran.trim())
-            years.sort()
-        }
-        return years
+        return getAcademicYearOptions(school.tahunAjaran)
     }, [school.tahunAjaran])
 
     const handleSaveSchool = async () => {

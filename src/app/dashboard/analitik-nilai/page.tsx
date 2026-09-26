@@ -1,8 +1,9 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { useSession } from "next-auth/react"
 import toast from "react-hot-toast"
+import { getAcademicYearOptions } from "@/lib/academicYear"
 
 interface SubjectStats {
     avg: number
@@ -66,6 +67,8 @@ export default function AnalitikNilaiPage() {
     const [data, setData] = useState<AnalyticsData | null>(null)
     const [loading, setLoading] = useState(true)
     const [selectedStudent, setSelectedStudent] = useState<string | null>(null)
+
+    const yearOptions = useMemo(() => getAcademicYearOptions(tahunAjaran), [tahunAjaran])
 
     useEffect(() => {
         if (typeof window !== "undefined") {
@@ -175,10 +178,9 @@ export default function AnalitikNilaiPage() {
                             }}
                             className="h-9 pl-3 pr-8 bg-white border border-[var(--border)] rounded-md text-sm outline-none focus:ring-1 focus:ring-black cursor-pointer appearance-none font-medium"
                         >
-                            <option value="2024/2025">TP 2024/2025</option>
-                            <option value="2025/2026">TP 2025/2026</option>
-                            <option value="2026/2027">TP 2026/2027</option>
-                            <option value="2027/2028">TP 2027/2028</option>
+                            {yearOptions.map((y) => (
+                                <option key={y} value={y}>TP {y}</option>
+                            ))}
                         </select>
                     </div>
 

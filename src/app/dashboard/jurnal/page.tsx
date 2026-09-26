@@ -1908,9 +1908,8 @@ function PrintPreviewModal({
         return d.getMonth().toString()
     })
 
-    const isGuruMapel = session?.user?.role === "guru_mapel"
     const teacherName = isModePAI
-        ? (isGuruMapel ? (session?.user?.name || "Guru Mata Pelajaran") : (activeMapel === "PAI" ? "Kuraesin, S.Pd.I" : (session?.user?.name || "Guru Mata Pelajaran")))
+        ? (session?.user?.name || "Guru Mata Pelajaran")
         : (waliKelas?.nama || session?.user?.name || "Guru Kelas")
     const schoolName = schoolSettings?.namaSekolah || "SD Negeri 2 Nangerang"
     const subjectName = isModePAI
@@ -2471,10 +2470,10 @@ function PrintPreviewModal({
                                             <p className="font-semibold">Kepala Sekolah</p>
                                             <div className="h-20"></div>
                                             <p className="font-bold underline uppercase">
-                                                {schoolSettings?.kepalaSekolah || "H. Ujang Ma'Mun, S.Pd.I."}
+                                                {schoolSettings?.kepalaSekolah || "-"}
                                             </p>
                                             <p className="text-[11px] mt-0.5">
-                                                NIP. {schoolSettings?.nipKepsek || "196912122007011021"}
+                                                {schoolSettings?.nipKepsek ? `NIP. ${schoolSettings.nipKepsek}` : "-"}
                                             </p>
                                         </div>
 

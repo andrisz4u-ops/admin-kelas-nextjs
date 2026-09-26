@@ -3,6 +3,7 @@
 import React from "react"
 import { SelectKelas, Button } from "@/components/ui"
 import { MONTH_NAMES } from "./types"
+import { getAcademicYearOptions } from "@/lib/academicYear"
 
 interface RekapFilterBarProps {
     kelas: number
@@ -37,6 +38,8 @@ export function RekapFilterBar({
     setTahunAjaran,
     onExport,
 }: RekapFilterBarProps) {
+    const yearOptions = React.useMemo(() => getAcademicYearOptions(tahunAjaran), [tahunAjaran])
+
     return (
         <div className="flex flex-wrap items-center gap-2">
             {/* Class selector */}
@@ -138,10 +141,9 @@ export function RekapFilterBar({
                             }}
                             className="h-9 pl-3 pr-8 bg-white border border-[var(--border)] rounded-md text-sm text-[var(--foreground)] outline-none focus:ring-1 focus:ring-black cursor-pointer appearance-none font-medium"
                         >
-                            <option value="2024/2025">2024/2025</option>
-                            <option value="2025/2026">2025/2026</option>
-                            <option value="2026/2027">2026/2027</option>
-                            <option value="2027/2028">2027/2028</option>
+                            {yearOptions.map((y) => (
+                                <option key={y} value={y}>{y}</option>
+                            ))}
                         </select>
                         <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[var(--accents-5)]">
                             <svg width="10" height="6" viewBox="0 0 10 6" fill="none">

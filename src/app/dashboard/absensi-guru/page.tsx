@@ -71,9 +71,8 @@ export default function AbsensiGuruPage() {
             if (teachersRes.ok) {
                 const data = await teachersRes.json()
 
-                // Custom sort order requested by user
+                // Custom sort order (Kepala Sekolah selalu dinamis di paling atas berdasarkan role)
                 const PRIORITY_NAMES = [
-                    "Ujang", // Kepala Sekolah
                     "Kuraesin",
                     "Kurnia", // Matches Kurnia Ningsih
                     "Endang Hermawan",
@@ -87,6 +86,10 @@ export default function AbsensiGuruPage() {
                 ];
 
                 const sortedData = data.sort((a: Teacher, b: Teacher) => {
+                    // Kepala Sekolah selalu di posisi nomor 1 di atas
+                    if (a.role === "kepsek") return -1;
+                    if (b.role === "kepsek") return 1;
+
                     const getIndex = (name: string) => {
                         return PRIORITY_NAMES.findIndex(p =>
                             name.toLowerCase().includes(p.toLowerCase()) ||

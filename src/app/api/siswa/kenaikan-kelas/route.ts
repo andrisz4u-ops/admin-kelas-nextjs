@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { hitungTahunAjaranBaru, siswaService } from "@/services/siswaService"
+import { getDefaultAcademicYear } from "@/lib/academicYear"
 
 export const dynamic = "force-dynamic"
 
@@ -28,7 +29,7 @@ export async function GET() {
         }
 
         const settings = await prisma.schoolSettings.findFirst()
-        const tahunAjaranSekarang = settings?.tahunAjaran || "2025/2026"
+        const tahunAjaranSekarang = settings?.tahunAjaran || getDefaultAcademicYear()
         const tahunAjaranBaru = hitungTahunAjaranBaru(tahunAjaranSekarang)
 
         return NextResponse.json({

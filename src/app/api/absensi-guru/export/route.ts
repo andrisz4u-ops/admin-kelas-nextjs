@@ -31,12 +31,12 @@ export async function POST(request: NextRequest) {
             prisma.waliKelas.findMany()
         ])
 
-        const kepsekName = schoolSettings?.kepalaSekolah || "H.Ujang Ma'mun, S.Pd.I"
-        const kepsekNip = schoolSettings?.nipKepsek || "196912122007011021"
+        const kepsekUser = teachersRaw.find(t => t.role === "kepsek")
+        const kepsekName = schoolSettings?.kepalaSekolah || kepsekUser?.name || "Kepala Sekolah"
+        const kepsekNip = schoolSettings?.nipKepsek || kepsekUser?.nip || "-"
 
-        // 2. Sort Logic
+        // 2. Sort Logic (Kepala Sekolah selalu nomor 1 di atas secara dinamis)
         const PRIORITY_NAMES = [
-            "Ujang",
             "Kuraesin",
             "Kurnia",
             "Endang",
@@ -50,6 +50,12 @@ export async function POST(request: NextRequest) {
         ];
 
         const teachers = teachersRaw.sort((a, b) => {
+            // Kepala Sekolah selalu di urutan paling atas tanpa bergantung pada nama orang
+            const isKepsekA = a.role === "kepsek" || (schoolSettings?.kepalaSekolah && a.name.toLowerCase().includes(schoolSettings.kepalaSekolah.toLowerCase()))
+            const isKepsekB = b.role === "kepsek" || (schoolSettings?.kepalaSekolah && b.name.toLowerCase().includes(schoolSettings.kepalaSekolah.toLowerCase()))
+            if (isKepsekA && !isKepsekB) return -1
+            if (!isKepsekA && isKepsekB) return 1
+
             const getIndex = (name: string) => {
                 return PRIORITY_NAMES.findIndex(p =>
                     name.toLowerCase().includes(p.toLowerCase()) ||
@@ -262,7 +268,7 @@ export async function POST(request: NextRequest) {
             dateRow.getCell(6).alignment = { horizontal: 'center' }
             dateRow.getCell(6).font = { name: 'Times New Roman', size: 12 }
 
-            const titleRow = worksheet.addRow(["", "", "", "", "", `Kepala SDN 2 Nangerang`])
+            const titleRow = worksheet.addRow(["", "", "", "", "", `Kepala ${schoolSettings?.namaSekolah || "Sekolah"}`])
             worksheet.mergeCells(titleRow.number, 6, titleRow.number, 8)
             titleRow.getCell(6).alignment = { horizontal: 'center' }
             titleRow.getCell(6).font = { name: 'Times New Roman', size: 12 }
@@ -276,7 +282,8 @@ export async function POST(request: NextRequest) {
             nameRow.getCell(6).alignment = { horizontal: 'center' }
             nameRow.getCell(6).font = { bold: true, underline: true, name: 'Times New Roman', size: 12 }
 
-            const nipRow = worksheet.addRow(["", "", "", "", "", `NIP.${kepsekNip}`])
+            const formattedNip = kepsekNip && kepsekNip !== "-" ? (kepsekNip.startsWith("NIP") ? kepsekNip : `NIP. ${kepsekNip}`) : "NIP. -"
+            const nipRow = worksheet.addRow(["", "", "", "", "", formattedNip])
             worksheet.mergeCells(nipRow.number, 6, nipRow.number, 8)
             nipRow.getCell(6).alignment = { horizontal: 'center' }
             nipRow.getCell(6).font = { name: 'Times New Roman', size: 12 }

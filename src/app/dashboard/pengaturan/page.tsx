@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { getDefaultAcademicYear } from "@/lib/academicYear"
 import { useSession } from "next-auth/react"
 import { SchoolSettings, MyAccount, DbInfo, KenaikanPreview } from "@/components/pengaturan/types"
 import { MyAccountSection } from "@/components/pengaturan/MyAccountSection"
@@ -16,7 +17,7 @@ export default function PengaturanPage() {
         namaSekolah: "SDN 2 Nangerang",
         kepalaSekolah: "",
         nipKepsek: "",
-        tahunAjaran: "2025/2026",
+        tahunAjaran: getDefaultAcademicYear(),
         semesterAktif: 1,
     })
 

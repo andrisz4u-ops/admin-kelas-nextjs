@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { hitungTahunAjaranBaru } from "@/services/siswaService"
+import { hitungTahunAjaranBaru, getDefaultAcademicYear, getAcademicYearOptions } from "@/lib/academicYear"
 
 describe("Academic Year Utilities", () => {
     it("should correctly increment standard academic year", () => {
@@ -13,5 +13,16 @@ describe("Academic Year Utilities", () => {
         const expected = `${nextYear}/${nextYear + 1}`
         expect(hitungTahunAjaranBaru("invalid-year")).toBe(expected)
         expect(hitungTahunAjaranBaru("")).toBe(expected)
+    })
+
+    it("should dynamically calculate default academic year based on date", () => {
+        const defaultYear = getDefaultAcademicYear()
+        expect(defaultYear).toMatch(/^\d{4}\/\d{4}$/)
+    })
+
+    it("should generate academic year options range and include active year", () => {
+        const options = getAcademicYearOptions("2035/2036")
+        expect(options.length).toBeGreaterThan(5)
+        expect(options).toContain("2035/2036")
     })
 })

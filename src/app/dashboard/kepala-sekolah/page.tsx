@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { getDefaultAcademicYear } from "@/lib/academicYear"
 import { useSession } from "next-auth/react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
@@ -90,7 +91,7 @@ export default function PrincipalDashboard() {
                     <p className="text-sm text-[var(--accents-5)] mt-1">
                         {isPengawas
                             ? `Supervisi & Pemantauan Akademik Seluruh Kelas • ${schoolInfo?.namaSekolah || "SDN 2 Nangerang"}`
-                            : `${schoolInfo?.namaSekolah || "SDN 2 Nangerang"} • Tahun Ajaran ${schoolInfo?.tahunAjaran || "2025/2026"}`}
+                            : `${schoolInfo?.namaSekolah || "SDN 2 Nangerang"} • Tahun Ajaran ${schoolInfo?.tahunAjaran || getDefaultAcademicYear()}`}
                     </p>
                 </div>
                 {overview && (

@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma"
 import { parseToUTCMidnight } from "@/lib/dateUtils"
 import { getSchoolDays, getSemesterRange, getMonthRange } from "@/lib/schoolCalendar"
+import { getDefaultAcademicYear } from "@/lib/academicYear"
 
 // Helper: tentukan tahunAjaran & semester dari tanggal
 export function determineTahunAjaranSemester(date: Date): { tahunAjaran: string; semester: number } {
@@ -57,7 +58,7 @@ export const absensiService = {
         let defaultSemester = bodySemester
         if (!defaultTahunAjaran || !defaultSemester) {
             const schoolSettings = await prisma.schoolSettings.findFirst()
-            if (!defaultTahunAjaran) defaultTahunAjaran = schoolSettings?.tahunAjaran || "2026/2027"
+            if (!defaultTahunAjaran) defaultTahunAjaran = schoolSettings?.tahunAjaran || getDefaultAcademicYear()
             if (!defaultSemester) defaultSemester = schoolSettings?.semesterAktif || 1
         }
 
@@ -164,14 +165,15 @@ export const absensiService = {
     }) {
         const { kelas, type, month, year, semester, tahunAjaranParam } = params
 
+        const defaultYear = getDefaultAcademicYear()
         const [schoolSettings, kalenderConfig] = await Promise.all([
             prisma.schoolSettings.findFirst(),
             prisma.kalenderConfig.findUnique({
-                where: { tahunAjaran: tahunAjaranParam || "2026/2027" },
+                where: { tahunAjaran: tahunAjaranParam || defaultYear },
             }),
         ])
 
-        const currentAcademicYear = tahunAjaranParam || schoolSettings?.tahunAjaran || "2026/2027"
+        const currentAcademicYear = tahunAjaranParam || schoolSettings?.tahunAjaran || defaultYear
 
         let startDate: Date, endDate: Date
 
